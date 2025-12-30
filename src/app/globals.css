@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0a;
+  --color-foreground: #ededed;
+  --color-primary: #10b981; /* Emerald 500 */
+  --color-primary-dark: #059669;
+  --color-accent: #3b82f6; /* Blue 500 */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #0f172a; /* Slate 900 */
+  --foreground: #f8fafc; /* Slate 50 */
+  --card: rgba(30, 41, 59, 0.7); /* Slate 800 with opacity */
+  --card-border: rgba(148, 163, 184, 0.1);
+  --input-bg: rgba(15, 23, 42, 0.6);
+}
+
+body {
+  background: radial-gradient(circle at top center, #1e293b, #0f172a);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+}
+
+.glass-input {
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  color: white;
+  transition: all 0.2s;
+}
+
+.glass-input:focus {
+  border-color: #10b981;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+/* Utility classes */
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

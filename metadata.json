@@ -1,0 +1,7 @@
+{
+  "name": "Rounding Manager - Professional Golf Solution",
+  "description": "A total rounding management solution for golfers, providing weather integration, restaurant recommendations, and travel scheduling based on your booking info.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

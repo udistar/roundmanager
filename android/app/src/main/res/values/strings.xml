@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GolfConciergy</string>
+    <string name="title_activity_main">GolfConciergy</string>
+    <string name="package_name">com.roundmanager.app</string>
+    <string name="custom_url_scheme">com.roundmanager.app</string>
+</resources>
