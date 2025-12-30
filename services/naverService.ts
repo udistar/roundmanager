@@ -1,8 +1,8 @@
 
 import { RoundingInfo } from "../types";
 
-const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_MAP_CLIENT_ID || "piwaad6bd5";
-const NAVER_CLIENT_SECRET = import.meta.env.VITE_NAVER_MAP_CLIENT_SECRET || "OrkdzUjYesTYl9MxSnFTZJkrqIb5s56MG6ZDWywj";
+const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_MAP_CLIENT_ID;
+const NAVER_CLIENT_SECRET = import.meta.env.VITE_NAVER_MAP_CLIENT_SECRET;
 // Proxy Prefix (defined in vite.config.ts)
 const PROXY_BASE = '/naver-api';
 
