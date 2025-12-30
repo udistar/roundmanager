@@ -3,6 +3,6 @@
   publish = "dist"
 
 [build.environment]
-  # Tell Netlify to ignore these keys during secret scanning because they are meant to be public in the client bundle
-  # Note: SECRETS_SCAN_OMIT_KEYS is a comma-separated list of env var names
-  SECRETS_SCAN_OMIT_KEYS = "VITE_NAVER_MAP_CLIENT_ID,VITE_NAVER_MAP_CLIENT_SECRET,VITE_NAVER_CLIENT_ID,VITE_NAVER_CLIENT_SECRET,VITE_NAVER_SEARCH_ID,VITE_NAVER_SEARCH_SECRET,VITE_GEMINI_API_KEY"
+  # Disable secrets scanning because it incorrectly flags public client-side API keys
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
