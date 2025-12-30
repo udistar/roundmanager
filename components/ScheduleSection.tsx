@@ -115,143 +115,141 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
   };
 
   return (
-    <div className="relative">
-      <div className="luxury-glass rounded-[32px] p-5 md:p-8 text-white shadow-2xl border luxury-border overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-600/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-sky-600/10 rounded-full blur-3xl"></div>
+    <div className="luxury-glass rounded-[28px] p-4 md:p-6 border luxury-border shadow-2xl space-y-4 relative overflow-hidden">
+      <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-600/10 rounded-full blur-3xl"></div>
+      <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-sky-600/10 rounded-full blur-3xl"></div>
 
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-black flex items-center tracking-tight">
-              <i className="fa-solid fa-route mr-3 text-emerald-400"></i>
-              스마트 컨시어지 경로
-            </h2>
-            <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-1.5 rounded-full text-[9px] font-black text-emerald-400 uppercase tracking-widest">
-              Live Optimized Path
-            </div>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-xl font-black flex items-center tracking-tight">
+            <i className="fa-solid fa-route mr-3 text-emerald-400"></i>
+            스마트 컨시어지 경로
+          </h2>
+          <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-1.5 rounded-full text-[9px] font-black text-emerald-400 uppercase tracking-widest">
+            Live Optimized Path
           </div>
+        </div>
 
-          <div className="mb-12 px-2 min-h-[180px]">
-            <div className="relative flex flex-col md:flex-row justify-between items-start space-y-12 md:space-y-0">
-              <div className="hidden md:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-slate-800 z-0">
-                <div className="h-full bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 opacity-50"></div>
+        <div className="mb-12 px-2 min-h-[180px]">
+          <div className="relative flex flex-col md:flex-row justify-between items-start space-y-12 md:space-y-0">
+            <div className="hidden md:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-slate-800 z-0">
+              <div className="h-full bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 opacity-50"></div>
+            </div>
+
+            {/* POINT 1: HOME */}
+            <div className="relative z-10 flex flex-col items-center group flex-1">
+              <div className="bg-slate-900 border-2 border-emerald-500 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.15)] group-hover:scale-105 transition-all duration-500">
+                <i className="fa-solid fa-house text-base"></i>
               </div>
-
-              {/* POINT 1: HOME */}
-              <div className="relative z-10 flex flex-col items-center group flex-1">
-                <div className="bg-slate-900 border-4 border-emerald-500 w-16 h-16 rounded-3xl flex items-center justify-center text-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.2)] group-hover:scale-105 transition-all duration-500">
-                  <i className="fa-solid fa-house text-2xl"></i>
+              <div className="mt-1.5 text-center">
+                <div className="text-base font-black tracking-tighter">
+                  {totalDirectTravelTime > 0 ? departureTime : '...'}
                 </div>
-                <div className="mt-3 text-center">
-                  <div className="text-xl font-black tracking-tighter">
-                    {totalDirectTravelTime > 0 ? departureTime : '...'}
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">집에서 출발</div>
-                </div>
-              </div>
-
-              {/* Travel Info 1 */}
-              <div className="hidden md:flex absolute top-0 left-[21%] w-[18%] h-10 items-center justify-center z-20">
-                <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-emerald-400">
-                  <i className="fa-solid fa-car-side mr-1.5 opacity-70"></i>
-                  {hasMeal
-                    ? (selectedRestaurantData?.travelTimeFromHome
-                      ? `${selectedRestaurantData.travelTimeFromHome} (${selectedRestaurantData.distanceFromHome})`
-                      : '경로 계산 중...')
-                    : `${leg1Time}분`}
-                </div>
-              </div>
-
-              {/* POINT 2: RESTAURANT (IF MEAL) */}
-              {hasMeal && (
-                <div className="relative z-10 flex flex-col items-center group flex-1">
-                  <div className="bg-slate-900 border-4 border-amber-500 w-16 h-16 rounded-3xl flex items-center justify-center text-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)] group-hover:scale-105 transition-all duration-500">
-                    <i className="fa-solid fa-utensils text-2xl"></i>
-                  </div>
-                  <div className="mt-3 text-center">
-                    <div className="text-xl font-black tracking-tighter text-amber-400">{restaurantArrivalTime}</div>
-                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">식당 도착</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Travel Info 2 (If Meal) */}
-              {hasMeal && (
-                <div className="hidden md:flex absolute top-0 left-[46%] w-[18%] h-10 items-center justify-center z-20">
-                  <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-sky-400">
-                    <i className="fa-solid fa-arrow-right-long mr-1.5 opacity-70"></i>
-                    {selectedRestaurantData?.travelTimeToGolfCourse
-                      ? `${selectedRestaurantData.travelTimeToGolfCourse} (${selectedRestaurantData.distanceToGolfCourse})`
-                      : '경로 계산 중...'}
-                  </div>
-                </div>
-              )}
-
-              {/* POINT 3: GOLF COURSE ARRIVAL & TEE-OFF */}
-              <div className="relative z-10 flex flex-col items-center group flex-1">
-                <div className="bg-emerald-600 border-4 border-white/20 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl group-hover:scale-105 transition-all duration-500">
-                  <i className="fa-solid fa-golf-ball-tee text-2xl"></i>
-                </div>
-                <div className="mt-3 text-center">
-                  <div className="text-xl font-black text-emerald-400 tracking-tighter">{golfCourseArrivalTime}</div>
-                  <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">골프장 도착</div>
-                  <div className="text-xs text-slate-400 font-bold mt-2">
-                    {arrivalBuffer}분 후 티업 ({teeOffTime})
-                  </div>
-                </div>
+                <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">집 출발</div>
               </div>
             </div>
-          </div>
 
-          <div className="border-t border-white/5 pt-8">
-            <div className="flex flex-col space-y-6">
-              <div>
-                <p className="text-emerald-400 font-black mb-1 uppercase text-[8px] tracking-[0.3em]">Recommended Schedule Analysis</p>
-                <div className="flex flex-wrap items-center gap-4">
-                  <h3 className="text-2xl md:text-3xl font-black tracking-tighter">
-                    {totalDirectTravelTime > 0 ? `정각 ${departureTime} 출발` : '경로 분석 중...'}
-                  </h3>
+            {/* Travel Info 1 */}
+            <div className="hidden md:flex absolute top-0 left-[21%] w-[18%] h-10 items-center justify-center z-20">
+              <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-emerald-400">
+                <i className="fa-solid fa-car-side mr-1.5 opacity-70"></i>
+                {hasMeal
+                  ? (selectedRestaurantData?.travelTimeFromHome
+                    ? `${selectedRestaurantData.travelTimeFromHome} (${selectedRestaurantData.distanceFromHome})`
+                    : '경로 계산 중...')
+                  : `${leg1Time}분`}
+              </div>
+            </div>
 
-                  {/* Google Calendar Button */}
-                  <button
-                    onClick={addToCalendar}
-                    className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-[10px] shadow-xl shadow-emerald-900/30 transition-all active:scale-95 group/cal"
-                  >
-                    <i className="fa-brands fa-google text-base group-hover/cal:rotate-12 transition-transform"></i>
-                    <span>구글 캘린더 등록</span>
-                  </button>
+            {/* POINT 2: RESTAURANT (IF MEAL) */}
+            {hasMeal && (
+              <div className="relative z-10 flex flex-col items-center group flex-1">
+                <div className="bg-slate-900 border-2 border-amber-500 w-10 h-10 rounded-xl flex items-center justify-center text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.15)] group-hover:scale-105 transition-all duration-500">
+                  <i className="fa-solid fa-utensils text-base"></i>
+                </div>
+                <div className="mt-1.5 text-center">
+                  <div className="text-base font-black tracking-tighter text-amber-400">{restaurantArrivalTime}</div>
+                  <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">식당 도착</div>
                 </div>
               </div>
+            )}
 
-              <div className="bg-white/5 p-4 rounded-[24px] border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">
-                      <i className="fa-solid fa-clock-rotate-left text-xs"></i>
-                    </div>
-                    <p className="text-xs text-slate-300 font-bold">
-                      티업 {arrivalBuffer}분 전 클럽하우스 도착
-                      {hasMeal && selectedRestaurantData?.distanceToGolfCourse &&
-                        ` (식당→골프장 ${selectedRestaurantData.distanceToGolfCourse})`}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">
-                      <i className="fa-solid fa-car text-xs"></i>
-                    </div>
-                    <p className="text-xs text-slate-300 font-bold">
-                      총 리드타임 {totalOffset}분 적용됨
-                      {hasMeal && selectedRestaurantData?.distanceFromHome &&
-                        ` (집→식당 ${selectedRestaurantData.distanceFromHome})`}
-                      {!hasMeal && totalDirectTravelTime > 0 &&
-                        ` (약 ${Math.round(totalDirectTravelTime * 0.8)}km)`}
-                    </p>
-                  </div>
+            {/* Travel Info 2 (If Meal) */}
+            {hasMeal && (
+              <div className="hidden md:flex absolute top-0 left-[46%] w-[18%] h-10 items-center justify-center z-20">
+                <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-sky-400">
+                  <i className="fa-solid fa-arrow-right-long mr-1.5 opacity-70"></i>
+                  {selectedRestaurantData?.travelTimeToGolfCourse
+                    ? `${selectedRestaurantData.travelTimeToGolfCourse} (${selectedRestaurantData.distanceToGolfCourse})`
+                    : '경로 계산 중...'}
                 </div>
-                <div className="flex flex-col justify-center items-end border-l border-white/10 pl-6">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">여유 시간 확보 완료</span>
-                  <span className="text-2xl font-black text-emerald-500 tracking-tighter">SUCCESS</span>
+              </div>
+            )}
+
+            {/* POINT 3: GOLF COURSE ARRIVAL & TEE-OFF */}
+            <div className="relative z-10 flex flex-col items-center group flex-1">
+              <div className="bg-emerald-600 border-2 border-white/20 w-10 h-10 rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-all duration-500">
+                <i className="fa-solid fa-golf-ball-tee text-base"></i>
+              </div>
+              <div className="mt-1.5 text-center">
+                <div className="text-base font-black text-emerald-400 tracking-tighter">{golfCourseArrivalTime}</div>
+                <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">골프장 도착</div>
+                <div className="text-[9px] text-slate-400 font-bold mt-0.5">
+                  {arrivalBuffer}분 전 ({teeOffTime})
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-white/5 pt-8">
+          <div className="flex flex-col space-y-6">
+            <div>
+              <p className="text-emerald-400 font-black mb-1 uppercase text-[7px] tracking-[0.3em]">Recommended Schedule Analysis</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <h3 className="text-xl md:text-2xl font-black tracking-tighter">
+                  {totalDirectTravelTime > 0 ? `정각 ${departureTime} 출발` : '경로 분석 중...'}
+                </h3>
+
+                {/* Google Calendar Button */}
+                <button
+                  onClick={addToCalendar}
+                  className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-[10px] shadow-xl shadow-emerald-900/30 transition-all active:scale-95 group/cal"
+                >
+                  <i className="fa-brands fa-google text-base group-hover/cal:rotate-12 transition-transform"></i>
+                  <span>구글 캘린더 등록</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white/5 p-4 rounded-[24px] border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                    <i className="fa-solid fa-clock-rotate-left text-xs"></i>
+                  </div>
+                  <p className="text-xs text-slate-300 font-bold">
+                    티업 {arrivalBuffer}분 전 클럽하우스 도착
+                    {hasMeal && selectedRestaurantData?.distanceToGolfCourse &&
+                      ` (식당→골프장 ${selectedRestaurantData.distanceToGolfCourse})`}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                    <i className="fa-solid fa-car text-xs"></i>
+                  </div>
+                  <p className="text-xs text-slate-300 font-bold">
+                    총 리드타임 {totalOffset}분 적용됨
+                    {hasMeal && selectedRestaurantData?.distanceFromHome &&
+                      ` (집→식당 ${selectedRestaurantData.distanceFromHome})`}
+                    {!hasMeal && totalDirectTravelTime > 0 &&
+                      ` (약 ${Math.round(totalDirectTravelTime * 0.8)}km)`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col justify-center items-end border-l border-white/10 pl-6">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">여유 시간 확보 완료</span>
+                <span className="text-2xl font-black text-emerald-500 tracking-tighter">SUCCESS</span>
               </div>
             </div>
           </div>

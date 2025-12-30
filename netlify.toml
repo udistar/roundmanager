@@ -9,7 +9,7 @@
 
 [[redirects]]
   from = "/naver-api/*"
-  to = "https://maps.apigw.ntruss.com/:splat"
+  to = "https://naveropenapi.apigw.ntruss.com/:splat"
   status = 200
   force = true
 

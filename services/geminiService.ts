@@ -113,22 +113,21 @@ export async function parseBookingMessage(message: string): Promise<RoundingInfo
 
         // 첫 번째 결과 사용 (가장 관련성 높음)
         const item = searchResponse.data.items[0];
-        const lat = parseFloat(item.mapy) / 10000000;
-        const lng = parseFloat(item.mapx) / 10000000;
         const naverAddress = item.roadAddress || item.address;
         const naverName = item.title.replace(/<[^>]*>?/gm, '');
 
-        console.log(`[Naver Search Override] ✅ Using result #1:`);
-        console.log(`[Naver Search Override] ✅ Name: ${naverName}`);
-        console.log(`[Naver Search Override] ✅ Address: ${naverAddress}`);
-        console.log(`[Naver Search Override] ✅ Coords: (${lat}, ${lng})`);
-        console.log(`[Naver Search Override] ❌ Gemini Address (IGNORED): ${parsed.address}`);
-        console.log(`[Naver Search Override] ❌ Gemini Coords (IGNORED): (${parsed.lat}, ${parsed.lng})`);
-
-        // 🔥 Gemini 데이터를 네이버 데이터로 완전히 교체
-        parsed.address = naverAddress;
-        parsed.lat = lat;
-        parsed.lng = lng;
+        // 🔥 Naver Geocoding API를 사용하여 정확한 좌표 획득
+        const geo = await getGeocode(naverAddress);
+        if (geo) {
+          parsed.address = geo.address;
+          parsed.lat = geo.lat;
+          parsed.lng = geo.lng;
+          console.log(`[Naver Search Override] ✅ Final Coords: (${geo.lat}, ${geo.lng})`);
+        } else {
+          // Geocode 실패 시 Search API 데이터라도 사용 (좌표는 0이 될 수 있으므로 주의)
+          parsed.address = naverAddress;
+          console.warn(`[Naver Search Override] ⚠️ Geocoding failed, using Search API address only.`);
+        }
 
         // 골프장 이름도 네이버 결과로 교체 (더 정확할 수 있음)
         if (naverName && naverName.length > 0) {

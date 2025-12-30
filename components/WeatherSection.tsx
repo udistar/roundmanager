@@ -37,7 +37,7 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
   }
 
   return (
-    <div className="luxury-glass rounded-[40px] p-6 md:p-8 border luxury-border shadow-2xl space-y-6 relative overflow-hidden">
+    <div className="luxury-glass rounded-[28px] p-4 md:p-6 border luxury-border shadow-2xl space-y-4 relative overflow-hidden">
       {/* Background Decor */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[100px] -mr-32 -mt-32"></div>
 
@@ -53,7 +53,7 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
       </div>
 
       {/* Main Source Cards - Fixed Horizontal Layout */}
-      <div className="grid grid-cols-3 gap-2 md:gap-3 relative z-10">
+      <div className="grid grid-cols-3 gap-1.5 md:gap-2 relative z-10">
         {data.slice(0, 3).map((w, idx) => {
           // Check for error flag (using explicit 'error' property injected by service)
           const isError = (w as any).error;
@@ -75,7 +75,7 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
             <div
               key={idx}
               onClick={() => setActiveSource(activeSource === idx ? null : idx)}
-              className={`cursor-pointer transition-all duration-300 p-2.5 md:p-4 rounded-xl md:rounded-2xl border flex flex-col justify-between ${activeSource === idx
+              className={`cursor-pointer transition-all duration-300 p-2 md:p-3 rounded-xl border flex flex-col justify-between ${activeSource === idx
                 ? 'bg-emerald-600/20 border-emerald-500 shadow-lg scale-[1.02]'
                 : (w.source?.includes('yr.no') ? 'bg-blue-900/20 border-blue-500/30' : 'bg-slate-900/40 border-white/5 hover:border-white/20')
                 }`}
