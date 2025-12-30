@@ -40,14 +40,30 @@ const App: React.FC = () => {
   const [currentStartLocation, setCurrentStartLocation] = useState<string>('');
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [startCoords, setStartCoords] = useState<{ lat: number, lng: number, address: string } | null>(null);
-  const [scheduledRounds, setScheduledRounds] = useState<RoundingPlan[]>(() => {
-    const saved = localStorage.getItem('scheduledRounds');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [scheduledRounds, setScheduledRounds] = useState<RoundingPlan[]>([]);
 
-  // Persist scheduled rounds
+  // 1. 앱이 처음 켜질 때 핸드폰 저장소에서 데이터 꺼내오기
   React.useEffect(() => {
-    localStorage.setItem('scheduledRounds', JSON.stringify(scheduledRounds));
+    try {
+      const saved = localStorage.getItem('myGolfRounds');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setScheduledRounds(parsed);
+          console.log('[LocalStorage] Loaded rounds:', parsed.length);
+        }
+      }
+    } catch (e) {
+      console.error('[LocalStorage] Load failed:', e);
+    }
+  }, []);
+
+  // 2. 라운딩 목록이 바뀔 때마다 핸드폰에 자동 저장
+  React.useEffect(() => {
+    if (scheduledRounds.length > 0) {
+      localStorage.setItem('myGolfRounds', JSON.stringify(scheduledRounds));
+      console.log('[LocalStorage] Saved rounds:', scheduledRounds.length);
+    }
   }, [scheduledRounds]);
 
   const handleAnalyze = async (message: string, location: string, customPrep: number) => {
@@ -129,7 +145,7 @@ const App: React.FC = () => {
         members: 4,
         location: info.address || '위치 정보 확인 중',
         startLocation: finalLocation, // 사용자가 입력한 출발지 저장
-        startCoords: startCoords, // 출발지 좌표도 함께 저장
+        startCoords: coords, // Use fetched coords directly (state update is async)
         fullInfo: info // Save the full analyzed info
       };
 
@@ -276,14 +292,14 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-20 selection:bg-emerald-500 selection:text-white">
       <Header />
 
-      <main className="max-w-6xl mx-auto px-4 py-12 space-y-12">
+      <main className="max-w-md mx-auto px-4 py-8 space-y-10">
         {!roundingInfo && !loading && (
           <div className="grid grid-cols-1 gap-12 items-start animate-in fade-in duration-1000">
             <div className="space-y-12">
               <div className="mb-4">
-                <h1 className="text-5xl font-black text-white leading-tight">
+                <h1 className="text-3xl font-black text-white leading-tight">
                   럭셔리 라운딩의 시작,<br />
-                  <span className="text-emerald-500">라운딩매니저(Rounding Manager)</span>
+                  <span className="text-emerald-500 text-2xl">라운딩매니저</span>
                 </h1>
                 <p className="text-slate-400 mt-4 text-lg leading-relaxed">
                   대한민국 골퍼에게 꼭 필요한 어플! 이제 라운딩매니저로 골프장 예약을 더욱 편하게 하세요.
@@ -410,7 +426,7 @@ const App: React.FC = () => {
                 }}
               />
 
-              <EliteServicesSection />
+              {/* <EliteServicesSection /> */}
 
             </div>
           </div>
@@ -433,47 +449,41 @@ const App: React.FC = () => {
         {roundingInfo && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
             {/* Rounding Summary Card */}
-            <div className="luxury-glass p-10 rounded-[40px] shadow-2xl border luxury-border flex flex-col lg:flex-row lg:items-center justify-between relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
-              <div className="flex items-center space-x-8 relative z-10">
-                <div className="bg-slate-900 w-24 h-24 rounded-3xl flex items-center justify-center border border-white/10 shadow-inner overflow-hidden relative group">
-                  {roundingInfo.logoUrl ? (
-                    <img
-                      src={roundingInfo.logoUrl}
-                      alt={roundingInfo.golfCourse}
-                      className="w-full h-full object-contain p-2"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '';
-                        (e.target as HTMLImageElement).classList.add('hidden');
-                        (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div className={`${roundingInfo.logoUrl ? 'hidden' : ''} text-emerald-500 text-4xl`}>
+            <div className="luxury-glass p-6 rounded-[32px] shadow-2xl border luxury-border flex flex-col items-center text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+
+              <div className="bg-slate-900 w-20 h-20 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner overflow-hidden mb-4">
+                {roundingInfo.logoUrl ? (
+                  <img
+                    src={roundingInfo.logoUrl}
+                    alt={roundingInfo.golfCourse}
+                    className="w-full h-full object-contain p-2"
+                  />
+                ) : (
+                  <div className="text-emerald-500 text-3xl">
                     <i className="fa-solid fa-flag"></i>
                   </div>
-                </div>
-                <div>
-                  <h2 className="text-4xl font-black text-white tracking-tight">{roundingInfo.golfCourse}</h2>
-                  <div className="flex flex-wrap gap-4 mt-3 text-slate-400 font-bold uppercase tracking-widest text-xs">
-                    <span className="bg-white/5 px-3 py-1 rounded-full border border-white/5"><i className="fa-regular fa-calendar-check mr-2 text-emerald-400"></i> {roundingInfo.date}</span>
-                    <span className="bg-white/5 px-3 py-1 rounded-full border border-white/5"><i className="fa-regular fa-clock mr-2 text-emerald-400"></i> {roundingInfo.teeOffTime} TEE-OFF</span>
-                  </div>
-                </div>
+                )}
               </div>
-              <div className="flex space-x-4 mt-8 lg:mt-0 relative z-10">
+
+              <h2 className="text-3xl font-black text-white tracking-tight mb-2">{roundingInfo.golfCourse}</h2>
+
+              <div className="flex flex-wrap justify-center gap-2 text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-6">
+                <span className="bg-white/5 px-3 py-1.5 rounded-full border border-white/5 flex items-center">
+                  <i className="fa-regular fa-calendar-check mr-2 text-emerald-400"></i> {roundingInfo.date}
+                </span>
+                <span className="bg-white/5 px-3 py-1.5 rounded-full border border-white/5 flex items-center">
+                  <i className="fa-regular fa-clock mr-2 text-emerald-400"></i> {roundingInfo.teeOffTime}
+                </span>
+              </div>
+
+              <div className="flex flex-col space-y-3 w-full relative z-10">
                 <button
                   onClick={() => { setRoundingInfo(null); setTravelTime(null); setWeatherData([]); setRestaurants([]); }}
-                  className="px-8 py-3 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-all font-bold"
+                  className="w-full py-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-all font-bold text-sm"
                 >
                   <i className="fa-solid fa-house mr-2"></i>
                   메인으로
-                </button>
-                <button
-                  onClick={() => { setRoundingInfo(null); setTravelTime(null); setWeatherData([]); setRestaurants([]); }}
-                  className="px-8 py-3 rounded-full border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all font-bold uppercase tracking-tighter"
-                >
-                  새로운 일정 분석
                 </button>
               </div>
             </div>
@@ -508,117 +518,123 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {weatherData.length > 0 ? (
-              <WeatherSection data={weatherData} />
-            ) : (
-              <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
-                <i className="fa-solid fa-cloud-sun text-slate-700 text-4xl mb-4"></i>
-                <p className="text-slate-500 font-bold">기상 분석 중...</p>
-              </div>
-            )}
+            {
+              weatherData.length > 0 ? (
+                <WeatherSection data={weatherData} />
+              ) : (
+                <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
+                  <i className="fa-solid fa-cloud-sun text-slate-700 text-4xl mb-4"></i>
+                  <p className="text-slate-500 font-bold">기상 분석 중...</p>
+                </div>
+              )
+            }
 
-            {restaurants.length > 0 ? (
-              <RestaurantSection
-                restaurants={restaurants}
-                onSelectRestaurant={handleSelectRestaurant}
-                selectedRestaurant={selectedRestaurant}
-              />
-            ) : (
-              <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
-                <i className="fa-solid fa-utensils text-slate-700 text-4xl mb-4"></i>
-                <p className="text-slate-500 font-bold">맛집 탐색 중...</p>
-              </div>
-            )}
+            {
+              restaurants.length > 0 ? (
+                <RestaurantSection
+                  restaurants={restaurants}
+                  onSelectRestaurant={handleSelectRestaurant}
+                  selectedRestaurant={selectedRestaurant}
+                />
+              ) : (
+                <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
+                  <i className="fa-solid fa-utensils text-slate-700 text-4xl mb-4"></i>
+                  <p className="text-slate-500 font-bold">맛집 탐색 중...</p>
+                </div>
+              )
+            }
 
             {/* YouTube 코스 공략 영상 */}
-            {videos.length > 0 && (
-              <div className="luxury-glass rounded-[40px] p-8 md:p-12 border luxury-border shadow-2xl space-y-8">
-                <div className="flex items-center space-x-4">
-                  <div className="h-10 w-1 bg-red-500"></div>
-                  <h2 className="text-2xl font-bold text-white uppercase tracking-tight">
-                    코스 공략 유튜브 추천 <span className="text-slate-500 text-lg font-light ml-2">Course Strategy</span>
-                  </h2>
-                </div>
+            {
+              videos.length > 0 && (
+                <div className="luxury-glass rounded-[40px] p-8 md:p-12 border luxury-border shadow-2xl space-y-8">
+                  <div className="flex items-center space-x-4">
+                    <div className="h-10 w-1 bg-red-500"></div>
+                    <h2 className="text-2xl font-bold text-white uppercase tracking-tight">
+                      코스 공략 유튜브 추천 <span className="text-slate-500 text-lg font-light ml-2">Course Strategy</span>
+                    </h2>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {videos.map((video, idx) => (
-                    <a
-                      key={idx}
-                      href={video.videoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative bg-white/5 rounded-3xl overflow-hidden border border-white/5 hover:border-red-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-red-500/20"
-                    >
-                      {/* Thumbnail */}
-                      <div className="relative aspect-video bg-slate-900">
-                        <img
-                          src={video.thumbnailUrl}
-                          alt={video.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-                        {/* Play Button Overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-colors">
-                          <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-2xl">
-                            <i className="fa-solid fa-play text-white text-xl ml-1"></i>
+                  <div className="grid grid-cols-1 gap-4">
+                    {videos.map((video, idx) => (
+                      <a
+                        key={idx}
+                        href={video.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative bg-white/5 rounded-3xl overflow-hidden border border-white/5 hover:border-red-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-red-500/20"
+                      >
+                        {/* Thumbnail */}
+                        <div className="relative aspect-video bg-slate-900">
+                          <img
+                            src={video.thumbnailUrl}
+                            alt={video.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          />
+                          {/* Play Button Overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-colors">
+                            <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-2xl">
+                              <i className="fa-solid fa-play text-white text-xl ml-1"></i>
+                            </div>
                           </div>
-                        </div>
-                        {/* Duration Badge */}
-                        {video.duration && (
-                          <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-bold text-white">
-                            {video.duration}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="p-4 space-y-2">
-                        <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-red-400 transition-colors">
-                          {video.title}
-                        </h3>
-                        <div className="flex items-center justify-between text-xs text-slate-400">
-                          <span className="flex items-center">
-                            <i className="fa-brands fa-youtube text-red-500 mr-2"></i>
-                            {video.channel}
-                          </span>
-                          {video.views && (
-                            <span className="flex items-center">
-                              <i className="fa-solid fa-eye mr-1"></i>
-                              {video.views}
-                            </span>
+                          {/* Duration Badge */}
+                          {video.duration && (
+                            <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-bold text-white">
+                              {video.duration}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            <EliteServicesSection />
+                        {/* Info */}
+                        <div className="p-4 space-y-2">
+                          <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                            {video.title}
+                          </h3>
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span className="flex items-center">
+                              <i className="fa-brands fa-youtube text-red-500 mr-2"></i>
+                              {video.channel}
+                            </span>
+                            {video.views && (
+                              <span className="flex items-center">
+                                <i className="fa-solid fa-eye mr-1"></i>
+                                {video.views}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+
+            {/* <EliteServicesSection /> */}
 
             <div id="favorite-sites-section">
               <FavoriteSites />
             </div>
 
-          </div>
+          </div >
         )}
-
         {loading && (
-          <div className="py-32 flex flex-col items-center justify-center space-y-8 animate-pulse">
+          <div className="py-20 flex flex-col items-center justify-center space-y-8 animate-pulse">
             <div className="relative">
-              <div className="w-32 h-32 border-[12px] border-white/5 border-t-emerald-600 rounded-full animate-spin"></div>
+              <div className="w-24 h-24 border-[8px] border-white/5 border-t-emerald-600 rounded-full animate-spin"></div>
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-emerald-500">
-                <i className="fa-solid fa-compass text-4xl animate-pulse"></i>
+                <i className="fa-solid fa-compass text-2xl animate-pulse"></i>
               </div>
             </div>
             <div className="text-center">
-              <h3 className="text-2xl font-black text-white tracking-widest uppercase">Initializing Concierge</h3>
-              <p className="text-slate-500 mt-2 font-medium">예약 정보를 확인하고 분석 엔진을 가동합니다.</p>
+              <h3 className="text-xl font-black text-white tracking-widest uppercase">Initializing</h3>
+              <p className="text-slate-500 mt-2 text-xs font-medium">예약 정보를 분석 중입니다.</p>
             </div>
           </div>
         )}
-      </main>
+      </main >
 
+      {/* 
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
         <div className="bg-slate-900/80 backdrop-blur-xl text-white px-8 py-5 rounded-[40px] shadow-2xl flex items-center justify-between border border-white/10 ring-1 ring-white/5">
           <div className="flex -space-x-3">
@@ -629,7 +645,8 @@ const App: React.FC = () => {
           <i className="fa-solid fa-fingerprint text-white/40"></i>
         </div>
       </div>
-    </div>
+      */}
+    </div >
   );
 };
 

@@ -2,6 +2,7 @@
 import React from 'react';
 
 const EliteServicesSection: React.FC = () => {
+    /* 
     const services = [
         {
             icon: 'fa-bell',
@@ -36,7 +37,11 @@ const EliteServicesSection: React.FC = () => {
             bgColor: 'bg-amber-500/10'
         }
     ];
+    */
 
+    return null;
+
+    /*
     return (
         <div className="space-y-8">
             <div className="flex items-center space-x-4">
@@ -76,6 +81,7 @@ const EliteServicesSection: React.FC = () => {
             </div>
         </div>
     );
+    */
 };
 
 export default EliteServicesSection;
