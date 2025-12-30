@@ -6,3 +6,21 @@
   # Disable secrets scanning because it incorrectly flags public client-side API keys
   SECRETS_SCAN_ENABLED = "false"
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
+[[redirects]]
+  from = "/naver-api/*"
+  to = "https://maps.apigw.ntruss.com/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/naver-map/*"
+  to = "https://naveropenapi.apigw.ntruss.com/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/naver-search/*"
+  to = "https://openapi.naver.com/:splat"
+  status = 200
+  force = true

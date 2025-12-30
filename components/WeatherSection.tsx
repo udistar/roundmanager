@@ -53,8 +53,8 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
       </div>
 
       {/* Main Source Cards - Fixed Horizontal Layout */}
-      <div className="grid grid-cols-4 gap-3 relative z-10">
-        {data.map((w, idx) => {
+      <div className="grid grid-cols-3 gap-2 md:gap-3 relative z-10">
+        {data.slice(0, 3).map((w, idx) => {
           // Check for error flag (using explicit 'error' property injected by service)
           const isError = (w as any).error;
 
@@ -75,40 +75,40 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
             <div
               key={idx}
               onClick={() => setActiveSource(activeSource === idx ? null : idx)}
-              className={`cursor-pointer transition-all duration-300 p-4 rounded-2xl border flex flex-col justify-between ${activeSource === idx
-                ? 'bg-emerald-600/20 border-emerald-500 shadow-lg'
+              className={`cursor-pointer transition-all duration-300 p-2.5 md:p-4 rounded-xl md:rounded-2xl border flex flex-col justify-between ${activeSource === idx
+                ? 'bg-emerald-600/20 border-emerald-500 shadow-lg scale-[1.02]'
                 : (w.source?.includes('yr.no') ? 'bg-blue-900/20 border-blue-500/30' : 'bg-slate-900/40 border-white/5 hover:border-white/20')
                 }`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className={`text-[9px] font-black uppercase tracking-tighter ${w.source?.includes('yr.no') ? 'text-blue-400' : 'text-slate-500'}`}>
+              <div className="flex items-start justify-between mb-2">
+                <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-tighter ${w.source?.includes('yr.no') ? 'text-blue-400' : 'text-slate-500'}`}>
                   {w.source}
-                  {w.source?.includes('yr.no') && <i className="fa-solid fa-star ml-1 text-[7px]"></i>}
+                  {w.source?.includes('yr.no') && <i className="fa-solid fa-star ml-0.5 text-[6px]"></i>}
                 </span>
-                <span className="text-2xl">{getWeatherIcon(w.condition)}</span>
+                <span className="text-xl md:text-2xl">{getWeatherIcon(w.condition)}</span>
               </div>
 
-              <div className="flex items-end justify-between">
-                <div className="flex flex-col">
-                  <span className="text-3xl font-black text-white tracking-tighter leading-none">{w.temperature}</span>
-                  <span className="text-[10px] text-slate-400 font-bold mt-1">{w.condition}</span>
+              <div className="flex items-end justify-between gap-1">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xl md:text-3xl font-black text-white tracking-tighter leading-none">{w.temperature}</span>
+                  <span className="text-[8px] md:text-[10px] text-slate-400 font-bold mt-1 truncate">{w.condition}</span>
                 </div>
 
-                <div className="flex flex-col items-end space-y-1">
-                  <div className="flex items-center space-x-1 text-[10px]">
-                    <i className="fa-solid fa-wind text-sky-500/70 text-[8px]"></i>
-                    <span className="text-slate-300 font-bold">{w.wind}</span>
+                <div className="flex flex-col items-end space-y-0.5">
+                  <div className="flex items-center space-x-1 text-[8px] md:text-[10px]">
+                    <i className="fa-solid fa-wind text-sky-500/70 text-[7px] md:text-[8px]"></i>
+                    <span className="text-slate-300 font-bold whitespace-nowrap">{w.wind}</span>
                   </div>
-                  <div className="flex items-center space-x-1 text-[10px]">
-                    <i className="fa-solid fa-cloud-rain text-blue-500/70 text-[8px]"></i>
-                    <span className="text-blue-400 font-bold">
+                  <div className="flex items-center space-x-1 text-[8px] md:text-[10px]">
+                    <i className="fa-solid fa-cloud-rain text-blue-500/70 text-[7px] md:text-[8px]"></i>
+                    <span className="text-blue-400 font-bold whitespace-nowrap">
                       {w.precipitation ? (
                         w.precipitation.includes('(') ? w.precipitation.split('(')[0].trim() : w.precipitation
                       ) : '0mm'}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-1 text-[10px]">
-                    <i className="fa-solid fa-percent text-cyan-500/70 text-[8px]"></i>
+                  <div className="flex items-center space-x-1 text-[8px] md:text-[10px]">
+                    <i className="fa-solid fa-percent text-cyan-500/70 text-[7px] md:text-[8px]"></i>
                     <span className="text-cyan-400 font-bold">
                       {w.precipitation ? (
                         w.precipitation.includes('(') ? w.precipitation.match(/\((\d+)%\)/)?.[1] + '%' : '0%'

@@ -116,7 +116,7 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
 
   return (
     <div className="relative">
-      <div className="luxury-glass rounded-[40px] p-8 text-white shadow-2xl border luxury-border overflow-hidden">
+      <div className="luxury-glass rounded-[32px] p-5 md:p-8 text-white shadow-2xl border luxury-border overflow-hidden">
         <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-600/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-sky-600/10 rounded-full blur-3xl"></div>
 
@@ -139,11 +139,11 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
 
               {/* POINT 1: HOME */}
               <div className="relative z-10 flex flex-col items-center group flex-1">
-                <div className="bg-slate-900 border-4 border-emerald-500 w-20 h-20 rounded-3xl flex items-center justify-center text-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.2)] group-hover:scale-110 transition-all duration-500">
-                  <i className="fa-solid fa-house text-3xl"></i>
+                <div className="bg-slate-900 border-4 border-emerald-500 w-16 h-16 rounded-3xl flex items-center justify-center text-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.2)] group-hover:scale-105 transition-all duration-500">
+                  <i className="fa-solid fa-house text-2xl"></i>
                 </div>
-                <div className="mt-4 text-center">
-                  <div className="text-2xl font-black tracking-tighter">
+                <div className="mt-3 text-center">
+                  <div className="text-xl font-black tracking-tighter">
                     {totalDirectTravelTime > 0 ? departureTime : '...'}
                   </div>
                   <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">집에서 출발</div>
@@ -165,11 +165,11 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
               {/* POINT 2: RESTAURANT (IF MEAL) */}
               {hasMeal && (
                 <div className="relative z-10 flex flex-col items-center group flex-1">
-                  <div className="bg-slate-900 border-4 border-amber-500 w-20 h-20 rounded-3xl flex items-center justify-center text-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)] group-hover:scale-110 transition-all duration-500">
-                    <i className="fa-solid fa-utensils text-3xl"></i>
+                  <div className="bg-slate-900 border-4 border-amber-500 w-16 h-16 rounded-3xl flex items-center justify-center text-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)] group-hover:scale-105 transition-all duration-500">
+                    <i className="fa-solid fa-utensils text-2xl"></i>
                   </div>
-                  <div className="mt-4 text-center">
-                    <div className="text-2xl font-black tracking-tighter text-amber-400">{restaurantArrivalTime}</div>
+                  <div className="mt-3 text-center">
+                    <div className="text-xl font-black tracking-tighter text-amber-400">{restaurantArrivalTime}</div>
                     <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">식당 도착</div>
                   </div>
                 </div>
@@ -189,11 +189,11 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
 
               {/* POINT 3: GOLF COURSE ARRIVAL & TEE-OFF */}
               <div className="relative z-10 flex flex-col items-center group flex-1">
-                <div className="bg-emerald-600 border-4 border-white/20 w-20 h-20 rounded-full flex items-center justify-center text-white shadow-2xl group-hover:scale-110 transition-all duration-500">
-                  <i className="fa-solid fa-golf-ball-tee text-4xl"></i>
+                <div className="bg-emerald-600 border-4 border-white/20 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl group-hover:scale-105 transition-all duration-500">
+                  <i className="fa-solid fa-golf-ball-tee text-2xl"></i>
                 </div>
-                <div className="mt-4 text-center">
-                  <div className="text-2xl font-black text-emerald-400 tracking-tighter">{golfCourseArrivalTime}</div>
+                <div className="mt-3 text-center">
+                  <div className="text-xl font-black text-emerald-400 tracking-tighter">{golfCourseArrivalTime}</div>
                   <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">골프장 도착</div>
                   <div className="text-xs text-slate-400 font-bold mt-2">
                     {arrivalBuffer}분 후 티업 ({teeOffTime})
@@ -206,24 +206,24 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
           <div className="border-t border-white/5 pt-8">
             <div className="flex flex-col space-y-6">
               <div>
-                <p className="text-emerald-400 font-black mb-2 uppercase text-[10px] tracking-[0.3em]">Recommended Schedule Analysis</p>
-                <div className="flex flex-wrap items-center gap-6">
-                  <h3 className="text-4xl font-black tracking-tighter">
+                <p className="text-emerald-400 font-black mb-1 uppercase text-[8px] tracking-[0.3em]">Recommended Schedule Analysis</p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <h3 className="text-2xl md:text-3xl font-black tracking-tighter">
                     {totalDirectTravelTime > 0 ? `정각 ${departureTime} 출발` : '경로 분석 중...'}
                   </h3>
 
                   {/* Google Calendar Button */}
                   <button
                     onClick={addToCalendar}
-                    className="flex items-center space-x-3 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-2xl font-bold text-xs shadow-xl shadow-emerald-900/30 transition-all active:scale-95 group/cal"
+                    className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-[10px] shadow-xl shadow-emerald-900/30 transition-all active:scale-95 group/cal"
                   >
-                    <i className="fa-brands fa-google text-lg group-hover/cal:rotate-12 transition-transform"></i>
+                    <i className="fa-brands fa-google text-base group-hover/cal:rotate-12 transition-transform"></i>
                     <span>구글 캘린더 등록</span>
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white/5 p-6 rounded-[32px] border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white/5 p-4 rounded-[24px] border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">

@@ -164,7 +164,7 @@ export async function fetchTravelTime(start: string, destination: string): Promi
 export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
   const cleanCourse = info.golfCourse.replace(/(CC|GC|클럽|골프장|리조트)/g, '').trim();
   const prompt = `Find ACTUAL weather for ${cleanCourse} (${info.address || ''}) on ${info.date} starting ${info.teeOffTime}.
-  SOURCES: 기상청(KMA), AccuWeather, The Weather Channel, yr.no (노르웨이 기상청).
+  SOURCES: 기상청(KMA), AccuWeather, yr.no (노르웨이 기상청).
   
   **CRITICAL CONSTRAINTS (ZERO TOLERANCE FOR RAMBLING)**:
   1. ALL TEXT MUST BE IN KOREAN.
@@ -177,10 +177,10 @@ export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
      - Each hourly entry must have: time (HH:00 format), temp, condition, precip, wind
      - Example: {"time": "09:00", "temp": "-5°C", "condition": "맑음", "precip": "0mm (0%)", "wind": "2m/s"}
   
-  Return JSON array of EXACTLY 4 objects (one for each source).
+  Return JSON array of EXACTLY 3 objects (one for each source).
   Schema: {source, temperature, wind, precipitation, condition, nowcast, hourly: [{time, temp, condition, precip, wind}]}`;
 
-  const sources = ["기상청(KMA)", "AccuWeather", "The Weather Channel", "yr.no (노르웨이 기상청)"];
+  const sources = ["기상청(KMA)", "AccuWeather", "yr.no (노르웨이 기상청)"];
 
   try {
     const response = await ai.models.generateContent({
@@ -191,8 +191,8 @@ export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
-          minItems: 4,
-          maxItems: 4,
+          minItems: 3,
+          maxItems: 3,
           items: {
             type: Type.OBJECT,
             properties: {
