@@ -28,8 +28,48 @@ const MapSection: React.FC<Props> = ({ startLocation, startCoords: startCoordsPr
   const [useLeaflet, setUseLeaflet] = useState(false);
   const leafletMapRef = useRef<any>(null);
   const L = (window as any).L;
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+
+  // Dynamically load Naver Maps SDK with actual client ID
+  useEffect(() => {
+    const loadNaverMapsSDK = () => {
+      if (window.naver && window.naver.maps) {
+        setSdkLoaded(true);
+        return;
+      }
+
+      const clientId = import.meta.env.VITE_NAVER_CLIENT_ID || import.meta.env.VITE_NAVER_MAP_CLIENT_ID;
+      if (!clientId) {
+        console.warn('[MapSection] No Naver Client ID found, will use Leaflet');
+        setUseLeaflet(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`;
+      script.async = true;
+      script.onload = () => {
+        console.log('[MapSection] Naver Maps SDK loaded successfully');
+        setSdkLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('[MapSection] Failed to load Naver Maps SDK');
+        setUseLeaflet(true);
+      };
+      document.head.appendChild(script);
+    };
+
+    loadNaverMapsSDK();
+  }, []);
 
   useEffect(() => {
+    // Wait for SDK to load
+    if (!sdkLoaded && !useLeaflet) {
+      console.log('[MapSection] Waiting for SDK to load...');
+      return;
+    }
+
     const goalCoords = { lat: golfCourseInfo.lat!, lng: golfCourseInfo.lng! };
 
     async function initMap() {
@@ -289,7 +329,7 @@ const MapSection: React.FC<Props> = ({ startLocation, startCoords: startCoordsPr
     return () => {
       window.removeEventListener('navermap_authFailure', handleAuthFailure);
     };
-  }, [golfCourseInfo, selectedRestaurant, startLocation]);
+  }, [golfCourseInfo, selectedRestaurant, startLocation, sdkLoaded, useLeaflet]);
 
   return (
     <div className="luxury-glass rounded-[40px] p-2 border luxury-border shadow-2xl overflow-hidden group">

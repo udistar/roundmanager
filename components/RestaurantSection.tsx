@@ -108,7 +108,7 @@ const RestaurantSection: React.FC<Props> = ({ restaurants, onSelectRestaurant, s
             라운딩 전 조식 추천 (TOP 3) <span className="text-slate-500 text-lg font-light ml-2">Morning Concierge</span>
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-6">
           {before.map(renderCard)}
         </div>
 
@@ -152,7 +152,7 @@ const RestaurantSection: React.FC<Props> = ({ restaurants, onSelectRestaurant, s
             라운딩 후 식사 추천 <span className="text-slate-500 text-lg font-light ml-2">After Rounding</span>
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-6">
           {after.map(renderCard)}
         </div>
       </div>

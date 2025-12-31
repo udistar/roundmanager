@@ -65,6 +65,8 @@ export async function getRoute(start: { lat: number, lng: number }, goal: { lat:
 
     try {
         console.log('[getRoute] Requesting:', url);
+        console.log('[getRoute] Start:', start, 'Goal:', goal, 'Waypoints:', waypoints);
+
         const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -78,15 +80,43 @@ export async function getRoute(start: { lat: number, lng: number }, goal: { lat:
             console.error('[getRoute] HTTP Error:', response.status, response.statusText);
             const errorText = await response.text();
             console.error('[getRoute] Error Response:', errorText);
+
+            // Try trafast as fallback
+            console.log('[getRoute] Trying trafast option as fallback...');
+            const fallbackUrl = url.replace('traoptimal', 'trafast');
+            const fallbackResponse = await fetch(fallbackUrl, {
+                method: 'GET',
+                headers: {
+                    'x-ncp-apigw-api-key-id': NAVER_CLIENT_ID,
+                    'x-ncp-apigw-api-key': NAVER_CLIENT_SECRET,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!fallbackResponse.ok) {
+                console.error('[getRoute] Fallback also failed');
+                return null;
+            }
+
+            const fallbackData = await fallbackResponse.json();
+            if (fallbackData.code === 0 && fallbackData.route && fallbackData.route.trafast) {
+                const routeInfo = fallbackData.route.trafast[0];
+                console.log('[getRoute] Fallback Success! Path points:', routeInfo.path.length);
+                return {
+                    path: routeInfo.path, // [lng, lat] 배열
+                    summary: routeInfo.summary,
+                    guide: routeInfo.guide
+                };
+            }
             return null;
         }
 
         const data = await response.json();
-        console.log('[getRoute] Response:', data);
+        console.log('[getRoute] Response code:', data.code);
 
         if (data.code === 0 && data.route && data.route.traoptimal) {
             const routeInfo = data.route.traoptimal[0];
-            console.log('[getRoute] Success! Duration:', routeInfo.summary.duration, 'ms');
+            console.log('[getRoute] Success! Path points:', routeInfo.path.length, 'Duration:', routeInfo.summary.duration, 'ms');
             return {
                 path: routeInfo.path, // [lng, lat] 배열
                 summary: routeInfo.summary,
@@ -94,7 +124,7 @@ export async function getRoute(start: { lat: number, lng: number }, goal: { lat:
             };
         }
 
-        console.warn('[getRoute] Invalid response code:', data.code);
+        console.warn('[getRoute] Invalid response code or missing route data:', data.code);
         return null;
     } catch (error) {
         console.error('[getRoute] Failed to fetch route:', error);
