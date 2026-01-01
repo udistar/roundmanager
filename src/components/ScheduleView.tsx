@@ -25,40 +25,54 @@ export default function ScheduleView({ schedule, hasBreakfast }: ScheduleViewPro
                     </p>
                 </div>
 
-                {/* Timeline */}
-                <div className="relative pl-6 border-l-2 border-slate-700 space-y-8 py-2">
-                    <div className="relative">
-                        <div className="absolute -left-[2.1rem] bg-slate-800 p-1.5 rounded-full border border-slate-600">
-                            <Car className="w-4 h-4 text-blue-400" />
-                        </div>
-                        <p className="text-white font-bold">Depart Home</p>
-                        <p className="text-xs text-slate-500">{schedule.departureTime}</p>
-                    </div>
+                {/* Timeline - Horizontal */}
+                <div className="relative mt-8 mb-4">
+                    {/* Connecting Line */}
+                    <div className="absolute top-4 left-4 right-4 h-0.5 bg-slate-700" />
 
-                    {hasBreakfast && (
-                        <div className="relative">
-                            <div className="absolute -left-[2.1rem] bg-slate-800 p-1.5 rounded-full border border-slate-600">
-                                <Coffee className="w-4 h-4 text-orange-400" />
+                    <div className="flex justify-between items-start relative z-10">
+                        {/* Depart Home */}
+                        <div className="flex flex-col items-center group">
+                            <div className="bg-slate-800 p-2 rounded-full border border-slate-600 mb-2 shadow-lg z-10 relative">
+                                <Car className="w-5 h-5 text-blue-400" />
                             </div>
-                            <p className="text-white font-bold">Breakfast</p>
-                            <p className="text-xs text-slate-500">30 min duration</p>
+                            <div className="text-center">
+                                <p className="text-white font-bold text-xs">Depart</p>
+                                <p className="text-[10px] text-slate-400">{schedule.departureTime}</p>
+                            </div>
                         </div>
-                    )}
 
-                    <div className="relative">
-                        <div className="absolute -left-[2.1rem] bg-slate-800 p-1.5 rounded-full border border-slate-600">
-                            <Flag className="w-4 h-4 text-emerald-500" />
-                        </div>
-                        <p className="text-white font-bold">Arrive Clubhouse</p>
-                        <p className="text-xs text-slate-500">{schedule.arrivalTime}</p>
-                    </div>
+                        {hasBreakfast && (
+                            <div className="flex flex-col items-center group">
+                                <div className="bg-slate-800 p-2 rounded-full border border-slate-600 mb-2 shadow-lg z-10 relative">
+                                    <Coffee className="w-5 h-5 text-orange-400" />
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-white font-bold text-xs">Breakfast</p>
+                                    <p className="text-[10px] text-slate-400">30m</p>
+                                </div>
+                            </div>
+                        )}
 
-                    <div className="relative">
-                        <div className="absolute -left-[2.1rem] bg-slate-800 p-1.5 rounded-full border border-slate-600">
-                            <Clock className="w-4 h-4 text-white" />
+                        <div className="flex flex-col items-center group">
+                            <div className="bg-slate-800 p-2 rounded-full border border-slate-600 mb-2 shadow-lg z-10 relative">
+                                <Flag className="w-5 h-5 text-emerald-500" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-white font-bold text-xs">Arrive</p>
+                                <p className="text-[10px] text-slate-400">{schedule.arrivalTime}</p>
+                            </div>
                         </div>
-                        <p className="text-white font-bold">Tee Off</p>
-                        <p className="text-xs text-slate-500">{schedule.teeTime}</p>
+
+                        <div className="flex flex-col items-center group">
+                            <div className="bg-slate-800 p-2 rounded-full border border-slate-600 mb-2 shadow-lg z-10 relative">
+                                <Clock className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-white font-bold text-xs">Tee Off</p>
+                                <p className="text-[10px] text-slate-400">{schedule.teeTime}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

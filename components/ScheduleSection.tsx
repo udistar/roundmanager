@@ -130,75 +130,78 @@ const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirec
           </div>
         </div>
 
-        <div className="mb-12 px-2 min-h-[180px]">
-          <div className="relative flex flex-col md:flex-row justify-between items-start space-y-12 md:space-y-0">
-            <div className="hidden md:block absolute top-10 left-[10%] right-[10%] h-0.5 bg-slate-800 z-0">
-              <div className="h-full bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 opacity-50"></div>
+        <div className="mb-0 px-2">
+          {/* Horizontal Timeline Container */}
+          <div className="relative flex items-center justify-between py-12 px-4 md:px-12">
+
+            {/* Connecting Line (Absolute) */}
+            <div className="absolute top-1/2 left-12 right-12 h-0.5 -translate-y-1/2 bg-slate-800 -z-0">
+              <div className="h-full bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 opacity-30 animate-pulse-slow"></div>
             </div>
 
-            {/* POINT 1: HOME */}
-            <div className="relative z-10 flex flex-col items-center group flex-1">
-              <div className="bg-slate-900 border-2 border-emerald-500 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.15)] group-hover:scale-105 transition-all duration-500">
-                <i className="fa-solid fa-house text-base"></i>
+            {/* STEP 1: HOME START */}
+            <div className="relative z-10 flex flex-col items-center group cursor-default">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)] group-hover:scale-110 transition-all duration-300">
+                <i className="fa-solid fa-house text-xl"></i>
               </div>
-              <div className="mt-1.5 text-center">
-                <div className="text-base font-black tracking-tighter">
-                  {totalDirectTravelTime > 0 ? departureTime : '...'}
-                </div>
-                <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">집 출발</div>
+              <div className="absolute -bottom-14 flex flex-col items-center min-w-[120px]">
+                <span className="text-xl md:text-2xl font-black text-white tracking-tighter shadow-black drop-shadow-lg">
+                  {totalDirectTravelTime > 0 ? departureTime : '--:--'}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-900/80 px-2 py-0.5 rounded-full border border-white/10 mt-1">
+                  집 출발
+                </span>
               </div>
-            </div>
-
-            {/* Travel Info 1 */}
-            <div className="hidden md:flex absolute top-0 left-[21%] w-[18%] h-10 items-center justify-center z-20">
-              <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-emerald-400">
-                <i className="fa-solid fa-car-side mr-1.5 opacity-70"></i>
-                {hasMeal
-                  ? (selectedRestaurantData?.travelTimeFromHome
-                    ? `${selectedRestaurantData.travelTimeFromHome} (${selectedRestaurantData.distanceFromHome})`
-                    : '경로 계산 중...')
-                  : `${leg1Time}분`}
+              {/* Distance Tooltip */}
+              <div className="absolute -top-10 bg-slate-800 text-[10px] font-bold text-emerald-400 px-2 py-1 rounded-lg border border-emerald-500/30 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                이동거리 {hasMeal ? selectedRestaurantData?.distanceFromHome : '약 --km'}
               </div>
             </div>
 
-            {/* POINT 2: RESTAURANT (IF MEAL) */}
+            {/* STEP 2: RESTAURANT (Conditional) */}
             {hasMeal && (
-              <div className="relative z-10 flex flex-col items-center group flex-1">
-                <div className="bg-slate-900 border-2 border-amber-500 w-10 h-10 rounded-xl flex items-center justify-center text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.15)] group-hover:scale-105 transition-all duration-500">
-                  <i className="fa-solid fa-utensils text-base"></i>
+              <div className="relative z-10 flex flex-col items-center group cursor-default">
+                <div className="w-14 h-14 rounded-2xl bg-slate-900 border-2 border-amber-500 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)] group-hover:scale-110 transition-all duration-300">
+                  <i className="fa-solid fa-utensils text-xl"></i>
                 </div>
-                <div className="mt-1.5 text-center">
-                  <div className="text-base font-black tracking-tighter text-amber-400">{restaurantArrivalTime}</div>
-                  <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">식당 도착</div>
+                <div className="absolute -bottom-14 flex flex-col items-center min-w-[120px]">
+                  <span className="text-xl md:text-2xl font-black text-white tracking-tighter shadow-black drop-shadow-lg">
+                    {restaurantArrivalTime}
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-500/20 mt-1">
+                    식당 도착
+                  </span>
+                </div>
+                {/* Meal Duration Tooltip */}
+                <div className="absolute -top-10 bg-slate-800 text-[10px] font-bold text-amber-400 px-2 py-1 rounded-lg border border-amber-500/30 whitespace-nowrap opacity-100">
+                  +30분 식사
                 </div>
               </div>
             )}
 
-            {/* Travel Info 2 (If Meal) */}
-            {hasMeal && (
-              <div className="hidden md:flex absolute top-0 left-[46%] w-[18%] h-10 items-center justify-center z-20">
-                <div className="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-[10px] font-bold text-sky-400">
-                  <i className="fa-solid fa-arrow-right-long mr-1.5 opacity-70"></i>
-                  {selectedRestaurantData?.travelTimeToGolfCourse
-                    ? `${selectedRestaurantData.travelTimeToGolfCourse} (${selectedRestaurantData.distanceToGolfCourse})`
-                    : '경로 계산 중...'}
-                </div>
+            {/* STEP 3: GOLF COURSE */}
+            <div className="relative z-10 flex flex-col items-center group cursor-default">
+              <div className="w-14 h-14 rounded-full bg-emerald-600 border-4 border-slate-900 flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 group-hover:scale-110 transition-all duration-300">
+                <i className="fa-solid fa-flag text-xl"></i>
               </div>
-            )}
+              <div className="absolute -bottom-14 flex flex-col items-center min-w-[120px]">
+                <span className="text-xl md:text-2xl font-black text-white tracking-tighter shadow-black drop-shadow-lg">
+                  {golfCourseArrivalTime}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-500/20 mt-1">
+                  골프장 도착
+                </span>
+              </div>
 
-            {/* POINT 3: GOLF COURSE ARRIVAL & TEE-OFF */}
-            <div className="relative z-10 flex flex-col items-center group flex-1">
-              <div className="bg-emerald-600 border-2 border-white/20 w-10 h-10 rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-all duration-500">
-                <i className="fa-solid fa-golf-ball-tee text-base"></i>
-              </div>
-              <div className="mt-1.5 text-center">
-                <div className="text-base font-black text-emerald-400 tracking-tighter">{golfCourseArrivalTime}</div>
-                <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">골프장 도착</div>
-                <div className="text-[9px] text-slate-400 font-bold mt-0.5">
-                  {arrivalBuffer}분 전 ({teeOffTime})
+              {/* Tee-off Info */}
+              <div className="absolute -top-12 flex flex-col items-center">
+                <span className="text-[10px] text-slate-500 font-bold mb-0.5">티업 {arrivalBuffer}분 전</span>
+                <div className="bg-emerald-500 text-white text-xs font-black px-2 py-0.5 rounded shadow-lg">
+                  {teeOffTime} 티업
                 </div>
               </div>
             </div>
+
           </div>
         </div>
 

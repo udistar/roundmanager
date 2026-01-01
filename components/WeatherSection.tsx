@@ -52,8 +52,8 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
         </div>
       </div>
 
-      {/* Main Source Cards - Fixed Horizontal Layout */}
-      <div className="grid grid-cols-3 gap-1.5 md:gap-2 relative z-10">
+      {/* Main Source Cards - Dynamic Layout */}
+      <div className={`grid gap-2 relative z-10 ${data.length === 1 ? 'grid-cols-1' : 'grid-cols-3'}`}>
         {data.slice(0, 3).map((w, idx) => {
           // Check for error flag (using explicit 'error' property injected by service)
           const isError = (w as any).error;

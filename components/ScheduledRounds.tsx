@@ -188,7 +188,7 @@ const ScheduledRounds: React.FC<{
                                         <button
                                             onClick={() => onView(round)}
                                             className="py-2.5 px-4 rounded-xl bg-amber-400 text-slate-900 font-bold hover:bg-amber-300 transition-all flex items-center justify-center shadow-lg shadow-amber-400/20 text-sm">
-                                            상세보기
+                                            시작
                                         </button>
                                         <button className="p-3 rounded-xl border border-slate-600 text-slate-400 hover:bg-slate-800 transition-colors" title="공유">
                                             <i className="fa-solid fa-share-nodes"></i>

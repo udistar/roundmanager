@@ -116,7 +116,7 @@ const BookingForm: React.FC<Props> = ({ onAnalyze, loading }) => {
           {loading ? (
             <><i className="fa-solid fa-circle-notch animate-spin mr-3"></i> 최적 경로 탐색 중...</>
           ) : (
-            <><i className="fa-solid fa-compass mr-3"></i> 컨시어지 서비스 시작</>
+            <><i className="fa-solid fa-compass mr-3"></i> 라운딩 저장하기</>
           )}
         </button>
       </form>

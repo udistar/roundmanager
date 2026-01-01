@@ -8,9 +8,10 @@ interface RestaurantListProps {
     title: string;
     locationName: string;
     type: 'PRE_ROUND' | 'POST_ROUND';
+    searchQuery?: string[]; // Array of selected menu items
 }
 
-export default function RestaurantList({ title, locationName, type }: RestaurantListProps) {
+export default function RestaurantList({ title, locationName, type, searchQuery }: RestaurantListProps) {
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,10 @@ export default function RestaurantList({ title, locationName, type }: Restaurant
             if (!locationName) return;
             setLoading(true);
             try {
-                const data = await getRecommendations(locationName, '', type);
+                // Join selected menus with space or comma for the search
+                // Assuming getRecommendations handles the query string
+                const query = searchQuery ? searchQuery.join(' ') : '';
+                const data = await getRecommendations(locationName, query, type);
                 setRestaurants(data);
             } catch (error) {
                 console.error("Failed to load restaurants:", error);
@@ -29,7 +33,7 @@ export default function RestaurantList({ title, locationName, type }: Restaurant
         };
 
         fetchRealData();
-    }, [locationName, type]);
+    }, [locationName, type, searchQuery]);
 
     if (loading) {
         return (

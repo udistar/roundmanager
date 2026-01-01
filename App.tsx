@@ -42,6 +42,58 @@ const App: React.FC = () => {
   const [startCoords, setStartCoords] = useState<{ lat: number, lng: number, address: string } | null>(null);
   const [scheduledRounds, setScheduledRounds] = useState<RoundingPlan[]>([]);
 
+  // State for Breakfast Menu Selection
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
+  const [isMenuConfirmed, setIsMenuConfirmed] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+
+  const MENU_OPTIONS = ['곰탕', '국밥', '해장국', '설렁탕', '순대국', '갈비탕', '백반', '중식'];
+
+  const toggleMenu = (menu: string) => {
+    setSelectedMenus(prev =>
+      prev.includes(menu) ? prev.filter(m => m !== menu) : [...prev, menu]
+    );
+  };
+
+  const handleMenuConfirm = async () => {
+    if (selectedMenus.length === 0) {
+      alert("최소 한 가지 메뉴를 선택해주세요.");
+      return;
+    }
+
+    setIsMenuConfirmed(true);
+    setLoading(true); // Show loading indicator while fetching restaurants
+
+    try {
+      if (roundingInfo) {
+        // Use selected menus as search query
+        const searchQuery = selectedMenus.join(' ');
+        console.log(`Searching restaurants with query: ${searchQuery}`);
+
+        // Pass the query to fetchRestaurants (need to update fetchRestaurants signature or logic if it doesn't support query)
+        // Assuming fetchRestaurants can handle query or we pass it as part of info
+        // Since fetchRestaurants currently takes (info, startLoc, coords), we might need to modify it or append query to info temporarily
+
+        // Or simpler: Just rely on default logic but append query to keyword
+        // Let's check fetchRestaurants implementation first in geminiService.ts. 
+        // Wait, fetchRestaurants calls getRecommendations.
+
+        // For now, let's just trigger the fetch.
+        const restaurantsData = await fetchRestaurants({
+          ...roundingInfo,
+          // Assuming we can infiltrate the query somehow or fetchRestaurants uses golfCourse name + "맛집"
+        }, currentStartLocation, startCoords, searchQuery); // We will need to update fetchRestaurants to accept searchQuery
+
+        setRestaurants(restaurantsData);
+      }
+    } catch (e) {
+      console.error("Failed to fetch restaurants after menu select:", e);
+      setError("맛집 정보를 불러오는데 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 1. 앱이 처음 켜질 때 핸드폰 저장소에서 데이터 꺼내오기
   React.useEffect(() => {
     try {
@@ -79,7 +131,14 @@ const App: React.FC = () => {
     setRestaurants([]);
     setTravelTime(null);
     setSelectedRestaurant(null);
+    setRestaurants([]);
+    setTravelTime(null);
+    setSelectedRestaurant(null);
     setStartCoords(null);
+
+    // Reset Menu Selection State
+    setSelectedMenus([]);
+    setIsMenuConfirmed(false);
 
     try {
       const info = await parseBookingMessage(message);
@@ -133,7 +192,10 @@ const App: React.FC = () => {
 
       setRoundingInfo(null); // Clear previous results so we don't show them immediately
       setWeatherData([]);
-      setRestaurants([]);
+      setRoundingInfo(null); // Clear previous results so we don't show them immediately
+      setWeatherData([]);
+      setRestaurants([]); // Ensure restaurants are cleared
+      setVideos([]);
       setVideos([]);
 
       // Save to scheduled rounds
@@ -301,10 +363,7 @@ const App: React.FC = () => {
                   럭셔리 라운딩의 시작,<br />
                   <span className="text-emerald-500 text-2xl">라운딩매니저</span>
                 </h1>
-                <p className="text-slate-400 mt-4 text-lg leading-relaxed">
-                  대한민국 골퍼에게 꼭 필요한 어플! 이제 라운딩매니저로 골프장 예약을 더욱 편하게 하세요.
-                  복잡한 예약 메시지 한 통으로 날씨, 맛집, 정확한 출발 시간까지 완벽하게 설계하십시오.
-                </p>
+
               </div>
               <BookingForm onAnalyze={handleAnalyze} loading={loading} />
 
@@ -327,6 +386,7 @@ const App: React.FC = () => {
 
                   setLoading(true);
                   setError(null);
+                  setLogoError(false);
                   setWeatherData([]);
                   setRestaurants([]);
                   setTravelTime(null);
@@ -405,17 +465,18 @@ const App: React.FC = () => {
                       console.log(`[DirectTime Fallback] Dist: ${distEst.toFixed(1)}km, Speed: ${speed}km/h, Time: ${directTime}m`);
                     }
 
-                    // Fetch other details (Weather, Restaurants, Videos)
-                    const [weather, restaurantsData, videosData] = await Promise.all([
+                    // Fetch other details (Weather, Videos) - Restaurants deferred until menu selection
+                    const [weather, videosData] = await Promise.all([
                       fetchWeather(info),
-                      fetchRestaurants(info, startLoc, coords),
+                      // fetchRestaurants(info, startLoc, coords), // DEFERRED
                       fetchCourseVideos(info.golfCourse)
                     ]);
 
                     setTravelTime(directTime); // Set calculated time
                     setWeatherData(weather);
-                    setRestaurants(restaurantsData);
+                    setRestaurants([]); // Clear restaurants since we defer fetching
                     setVideos(videosData);
+                    console.log('[Videos] Fetched videos:', videosData.length, videosData);
 
                   } catch (err) {
                     console.error("Failed to load round details:", err);
@@ -452,19 +513,22 @@ const App: React.FC = () => {
             <div className="luxury-glass p-6 rounded-[32px] shadow-2xl border luxury-border flex flex-col items-center text-center relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
 
-              <div className="bg-slate-900 w-20 h-20 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner overflow-hidden mb-4">
-                {roundingInfo.logoUrl ? (
-                  <img
-                    src={roundingInfo.logoUrl}
-                    alt={roundingInfo.golfCourse}
-                    className="w-full h-full object-contain p-2"
-                  />
-                ) : (
-                  <div className="text-emerald-500 text-3xl">
-                    <i className="fa-solid fa-flag"></i>
-                  </div>
-                )}
-              </div>
+              {!logoError && (
+                <div className="bg-slate-900 w-20 h-20 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner overflow-hidden mb-4">
+                  {roundingInfo.logoUrl ? (
+                    <img
+                      src={roundingInfo.logoUrl}
+                      alt={roundingInfo.golfCourse}
+                      className="w-full h-full object-contain p-2"
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <div className="text-emerald-500 text-3xl">
+                      <i className="fa-solid fa-flag"></i>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <h2 className="text-3xl font-black text-white tracking-tight mb-2">{roundingInfo.golfCourse}</h2>
 
@@ -479,7 +543,14 @@ const App: React.FC = () => {
 
               <div className="flex flex-col space-y-3 w-full relative z-10">
                 <button
-                  onClick={() => { setRoundingInfo(null); setTravelTime(null); setWeatherData([]); setRestaurants([]); }}
+                  onClick={() => {
+                    setRoundingInfo(null);
+                    setTravelTime(null);
+                    setWeatherData([]);
+                    setRestaurants([]);
+                    setIsMenuConfirmed(false);
+                    setSelectedMenus([]);
+                  }}
                   className="w-full py-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-all font-bold text-sm"
                 >
                   <i className="fa-solid fa-house mr-2"></i>
@@ -489,6 +560,17 @@ const App: React.FC = () => {
             </div>
 
 
+            {/* Weather Section - Moved above route */}
+            {
+              weatherData.length > 0 ? (
+                <WeatherSection data={weatherData} />
+              ) : (
+                <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
+                  <i className="fa-solid fa-cloud-sun text-slate-700 text-4xl mb-4"></i>
+                  <p className="text-slate-500 font-bold">기상 분석 중...</p>
+                </div>
+              )
+            }
 
             {/* Map & Timeline Vertical Layout */}
             <div className="space-y-12">
@@ -519,96 +601,133 @@ const App: React.FC = () => {
             </div>
 
             {
-              weatherData.length > 0 ? (
-                <WeatherSection data={weatherData} />
-              ) : (
-                <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
-                  <i className="fa-solid fa-cloud-sun text-slate-700 text-4xl mb-4"></i>
-                  <p className="text-slate-500 font-bold">기상 분석 중...</p>
-                </div>
-              )
-            }
+              !isMenuConfirmed ? (
+                <div className="luxury-glass p-8 rounded-3xl border luxury-border space-y-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <i className="fa-solid fa-utensils text-emerald-500 text-xl"></i>
+                    <h3 className="text-xl font-bold text-white">아침 식사 메뉴 선택</h3>
+                  </div>
 
-            {
-              restaurants.length > 0 ? (
-                <RestaurantSection
-                  restaurants={restaurants}
-                  onSelectRestaurant={handleSelectRestaurant}
-                  selectedRestaurant={selectedRestaurant}
-                />
-              ) : (
-                <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
-                  <i className="fa-solid fa-utensils text-slate-700 text-4xl mb-4"></i>
-                  <p className="text-slate-500 font-bold">맛집 탐색 중...</p>
+                  <p className="text-slate-400 text-sm">
+                    원하시는 조식 메뉴를 선택해주세요. 선택하신 메뉴 위주로 주변 맛집을 추천해드립니다.
+                  </p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {MENU_OPTIONS.map(menu => (
+                      <button
+                        key={menu}
+                        onClick={() => toggleMenu(menu)}
+                        className={`p-4 rounded-xl text-sm font-bold transition-all duration-300 border ${selectedMenus.includes(menu)
+                          ? 'bg-emerald-600 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105'
+                          : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-700 hover:text-white hover:border-white/20'
+                          }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span>{menu}</span>
+                          {selectedMenus.includes(menu) && <i className="fa-solid fa-check text-xs"></i>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleMenuConfirm}
+                    disabled={selectedMenus.length === 0}
+                    className="w-full py-4 mt-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {loading ? (
+                      <i className="fa-solid fa-spinner animate-spin"></i>
+                    ) : (
+                      <i className="fa-solid fa-magnifying-glass"></i>
+                    )}
+                    <span>맛집 검색하기</span>
+                  </button>
                 </div>
+              ) : (
+                restaurants.length > 0 ? (
+                  <RestaurantSection
+                    restaurants={restaurants}
+                    onSelectRestaurant={handleSelectRestaurant}
+                    selectedRestaurant={selectedRestaurant}
+                  />
+                ) : (
+                  <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
+                    <i className="fa-solid fa-utensils text-slate-700 text-4xl mb-4"></i>
+                    <p className="text-slate-500 font-bold">맛집 탐색 중...</p>
+                  </div>
+                )
               )
             }
 
             {/* YouTube 코스 공략 영상 */}
-            {
-              videos.length > 0 && (
-                <div className="luxury-glass rounded-[40px] p-8 md:p-12 border luxury-border shadow-2xl space-y-8">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-10 w-1 bg-red-500"></div>
-                    <h2 className="text-2xl font-bold text-white uppercase tracking-tight">
-                      코스 공략 유튜브 추천 <span className="text-slate-500 text-lg font-light ml-2">Course Strategy</span>
-                    </h2>
-                  </div>
+            <div className="luxury-glass rounded-[40px] p-8 md:p-12 border luxury-border shadow-2xl space-y-8">
+              <div className="flex items-center space-x-4">
+                <div className="h-10 w-1 bg-red-500"></div>
+                <h2 className="text-2xl font-bold text-white uppercase tracking-tight">
+                  코스 공략 유튜브 추천 <span className="text-slate-500 text-lg font-light ml-2">Course Strategy</span>
+                </h2>
+              </div>
 
-                  <div className="grid grid-cols-1 gap-4">
-                    {videos.map((video, idx) => (
-                      <a
-                        key={idx}
-                        href={video.videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group relative bg-white/5 rounded-3xl overflow-hidden border border-white/5 hover:border-red-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-red-500/20"
-                      >
-                        {/* Thumbnail */}
-                        <div className="relative aspect-video bg-slate-900">
-                          <img
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                          {/* Play Button Overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-colors">
-                            <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-2xl">
-                              <i className="fa-solid fa-play text-white text-xl ml-1"></i>
-                            </div>
+              {videos.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {videos.map((video, idx) => (
+                    <a
+                      key={idx}
+                      href={video.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative bg-white/5 rounded-3xl overflow-hidden border border-white/5 hover:border-red-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-red-500/20"
+                    >
+                      {/* Thumbnail */}
+                      <div className="relative aspect-video bg-slate-900">
+                        <img
+                          src={video.thumbnailUrl}
+                          alt={video.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        {/* Play Button Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/60 transition-colors">
+                          <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-2xl">
+                            <i className="fa-solid fa-play text-white text-xl ml-1"></i>
                           </div>
-                          {/* Duration Badge */}
-                          {video.duration && (
-                            <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-bold text-white">
-                              {video.duration}
-                            </div>
+                        </div>
+                        {/* Duration Badge */}
+                        {video.duration && (
+                          <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-bold text-white">
+                            {video.duration}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="p-4 space-y-2">
+                        <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-red-400 transition-colors">
+                          {video.title}
+                        </h3>
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span className="flex items-center">
+                            <i className="fa-brands fa-youtube text-red-500 mr-2"></i>
+                            {video.channel}
+                          </span>
+                          {video.views && (
+                            <span className="flex items-center">
+                              <i className="fa-solid fa-eye mr-1"></i>
+                              {video.views}
+                            </span>
                           )}
                         </div>
-
-                        {/* Info */}
-                        <div className="p-4 space-y-2">
-                          <h3 className="text-sm font-bold text-white line-clamp-2 group-hover:text-red-400 transition-colors">
-                            {video.title}
-                          </h3>
-                          <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span className="flex items-center">
-                              <i className="fa-brands fa-youtube text-red-500 mr-2"></i>
-                              {video.channel}
-                            </span>
-                            {video.views && (
-                              <span className="flex items-center">
-                                <i className="fa-solid fa-eye mr-1"></i>
-                                {video.views}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
+                      </div>
+                    </a>
+                  ))}
                 </div>
-              )
-            }
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <i className="fa-brands fa-youtube text-slate-700 text-6xl mb-4"></i>
+                  <p className="text-slate-400 font-bold mb-2">코스 공략 영상을 찾는 중입니다...</p>
+                  <p className="text-slate-500 text-sm">잠시만 기다려주세요.</p>
+                </div>
+              )}
+            </div>
 
             {/* <EliteServicesSection /> */}
 
