@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Restaurant } from '@/types';
+import { SEARCH_PROXY_BASE } from '@/services/naverService';
 
 export async function getRecommendations(
     courseName: string,
@@ -11,7 +12,7 @@ export async function getRecommendations(
             ? `${courseName} 아침식사 맛집`
             : `${courseName} 맛집`;
 
-        const response = await axios.get('/naver-search/v1/search/local.json', {
+        const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
             params: {
                 query: query,
                 display: 5,

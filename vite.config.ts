@@ -9,9 +9,9 @@ export default defineConfig(({ mode }) => {
       port: 3003,
       host: '0.0.0.0',
       proxy: {
-        // 기존 지도 API 프록시 (Cloud API)
+        // 기존 지도 API 프록시 (Cloud API / Open API 통합)
         '/naver-api': {
-          target: 'https://maps.apigw.ntruss.com',
+          target: 'https://naveropenapi.apigw.ntruss.com',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/naver-api/, ''),
           secure: false,

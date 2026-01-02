@@ -3,8 +3,14 @@ import { RoundingInfo } from "../types";
 
 const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_MAP_CLIENT_ID || import.meta.env.VITE_NAVER_CLIENT_ID;
 const NAVER_CLIENT_SECRET = import.meta.env.VITE_NAVER_MAP_CLIENT_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET;
-// Proxy Prefix (defined in vite.config.ts)
-const PROXY_BASE = '/naver-api';
+// Proxy Prefix (defined in vite.config.ts and netlify.toml)
+const IS_PROD = import.meta.env.PROD;
+const NETLIFY_URL = 'https://roundmanager.netlify.app';
+
+// Relative path works in local dev (Vite proxy)
+// Absolute path is required for Mobile (Capacitor) to hit the Netlify proxy
+export const PROXY_BASE = IS_PROD ? `${NETLIFY_URL}/naver-api` : '/naver-api';
+export const SEARCH_PROXY_BASE = IS_PROD ? `${NETLIFY_URL}/naver-search` : '/naver-search';
 
 export interface GeoLocation {
     lat: number;
@@ -194,8 +200,8 @@ const SEARCH_CLIENT_SECRET = import.meta.env.VITE_NAVER_SEARCH_SECRET || import.
  */
 export async function searchLocation(query: string): Promise<GeoLocation | null> {
     try {
-        // 검색 API 프록시 사용 (/naver-search)
-        const url = `/naver-search/v1/search/local.json?query=${encodeURIComponent(query)}&display=1&sort=random`;
+        // 검색 API 프록시 사용 (SEARCH_PROXY_BASE: /naver-search)
+        const url = `${SEARCH_PROXY_BASE}/v1/search/local.json?query=${encodeURIComponent(query)}&display=1&sort=random`;
 
         const response = await fetch(url, {
             method: 'GET',

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import { SEARCH_PROXY_BASE } from '@/services/naverService';
 
 // 네이버 검색 API 응답 타입 정의
 interface SearchItem {
@@ -17,17 +18,16 @@ const RestaurantSection = () => {
     // 1. 맛집 데이터 가져오기 함수
     const fetchRestaurants = async (query: string) => {
         try {
-            // 프록시 경로(/naver-search)를 통해 호출
-            const response = await axios.get('/naver-search/v1/search/local.json', {
+            // 프록시 경로(SEARCH_PROXY_BASE: /naver-search)를 통해 호출
+            const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
                 params: {
                     query: query,   // 예: '춘천 베어크리크 맛집'
                     display: 5,     // 5개만 표시
                     sort: 'comment' // 리뷰 많은 순 (혹은 random)
                 },
                 headers: {
-                    // 주의: 실제 서비스에서는 백엔드에서 호출하거나 프록시 설정을 통해 키를 숨겨야 합니다.
-                    'X-Naver-Client-Id': '여기에_새로받은_검색API_ID',
-                    'X-Naver-Client-Secret': '여기에_새로받은_검색API_SECRET'
+                    'X-Naver-Client-Id': import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID,
+                    'X-Naver-Client-Secret': import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET
                 }
             });
 

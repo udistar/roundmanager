@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { GoogleGenAI, Type } from "@google/genai";
 import { RoundingInfo, WeatherData, Restaurant } from "../types";
+import { getGeocode, SEARCH_PROXY_BASE } from './naverService';
 
 const ai = new GoogleGenAI({ apiKey: (import.meta.env.VITE_GEMINI_API_KEY || '') as string });
 
@@ -91,7 +92,7 @@ export async function parseBookingMessage(message: string): Promise<RoundingInfo
 
       console.log(`[Naver Search Override] Searching for: ${parsed.golfCourse}`);
 
-      const searchResponse = await axios.get('/naver-search/v1/search/local.json', {
+      const searchResponse = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
         params: {
           query: parsed.golfCourse,
           display: 5  // 여러 결과 확인
@@ -254,7 +255,7 @@ export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
 // 3.5 골프장 위치 검색 (정확한 주소 및 좌표 확보용)
 export async function searchGolfCourseLocation(courseName: string): Promise<{ address: string, lat: number, lng: number } | null> {
   try {
-    const response = await axios.get('/naver-search/v1/search/local.json', {
+    const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
       params: {
         query: courseName,
         display: 1
@@ -292,7 +293,7 @@ const searchRestaurantMenu = async (restaurantName: string, region: string = "")
     const naverId = import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID;
     const naverSecret = import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET;
 
-    const response = await axios.get('/naver-search/v1/search/local.json', {
+    const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
       params: {
         query: `${region} ${restaurantName}`.trim(),
         display: 1
@@ -309,8 +310,6 @@ const searchRestaurantMenu = async (restaurantName: string, region: string = "")
     return null;
   }
 };
-
-import { getGeocode } from './naverService';
 
 // 하버사인 공식 (거리 계산)
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -329,7 +328,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 export async function fetchRestaurants(info: RoundingInfo, _startLocation: string, startCoords?: { lat: number, lng: number } | null, userSearchQuery?: string): Promise<Restaurant[]> {
   const fetchFromNaver = async (query: string, type: 'before' | 'after', sortMethod: 'comment' | 'sim' = 'comment'): Promise<Restaurant[]> => {
     try {
-      const response = await axios.get('/naver-search/v1/search/local.json', {
+      const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
         params: {
           query: query,
           display: 8, // Reduce from 15 to 8 to minimize subsequent detail calls
