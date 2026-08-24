@@ -1,11 +1,20 @@
 
 import React from 'react';
 
-const Header: React.FC = () => {
+interface Props {
+  onNavigate?: (target: 'service' | 'analytics' | 'vault') => void;
+}
+
+const Header: React.FC<Props> = ({ onNavigate }) => {
+  const go = (target: 'service' | 'analytics' | 'vault') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    onNavigate?.(target);
+  };
+
   return (
     <header className="bg-slate-950/80 backdrop-blur-xl border-b border-white/5 py-8 px-6 sticky top-0 z-[60]">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
-        <div className="flex items-center space-x-4 group cursor-pointer">
+        <div className="flex items-center space-x-4 group cursor-pointer" onClick={() => onNavigate?.('service')}>
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-3 rounded-2xl shadow-lg shadow-emerald-900/20 group-hover:scale-110 transition-transform">
             <i className="fa-solid fa-crown text-2xl text-white"></i>
           </div>
@@ -15,9 +24,9 @@ const Header: React.FC = () => {
           </div>
         </div>
         <nav className="hidden md:flex items-center space-x-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-          <a href="#" className="hover:text-white transition-colors">Service</a>
-          <a href="#" className="hover:text-white transition-colors">Analytics</a>
-          <a href="#" className="hover:text-white transition-colors">Vault</a>
+          <a href="#booking" onClick={go('service')} className="hover:text-white transition-colors">Service</a>
+          <a href="#rounds" onClick={go('analytics')} className="hover:text-white transition-colors">Analytics</a>
+          <a href="#vault" onClick={go('vault')} className="hover:text-white transition-colors">Vault</a>
         </nav>
       </div>
     </header>

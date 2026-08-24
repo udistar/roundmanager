@@ -70,7 +70,10 @@ const MapSection: React.FC<Props> = ({ startLocation, startCoords: startCoordsPr
       return;
     }
 
-    const goalCoords = { lat: golfCourseInfo.lat!, lng: golfCourseInfo.lng! };
+    const goalCoords = {
+      lat: golfCourseInfo.lat || 37.8183,
+      lng: golfCourseInfo.lng || 127.5897,
+    };
 
     async function initMap() {
       console.log('[MapSection] Initializing map...');

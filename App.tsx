@@ -1,30 +1,67 @@
 
 import React, { useState } from 'react';
 import Header from './components/Header';
-import BookingForm from './components/BookingForm';
+import BookingForm, { AnalyzeRequest } from './components/BookingForm';
 import WeatherSection from './components/WeatherSection';
 import RestaurantSection from './components/RestaurantSection';
 import ScheduleSection from './components/ScheduleSection';
 import MapSection from './components/MapSection';
 import FavoriteSites from './components/FavoriteSites';
-import EliteServicesSection from './components/EliteServicesSection';
-import { parseBookingMessage, fetchTravelTime, fetchWeather, fetchRestaurants, fetchCourseVideos, searchGolfCourseLocation } from './services/geminiService';
-import { getGeocode, getRoute, fetchStaticMapImage, searchLocation } from './services/naverService';
-import { RoundingInfo, WeatherData, Restaurant } from './types';
+import { parseBookingMessage, fetchWeather, fetchRestaurants, fetchCourseVideos, searchGolfCourseLocation } from './services/geminiService';
+import { getGeocode, getRoute, searchLocation } from './services/naverService';
+import { RoundingInfo, WeatherData, Restaurant, GeoLocation } from './types';
 import { getGolfCourseAssets } from './constants/golfCourseAssets';
 import ScheduledRounds, { RoundingPlan } from './components/ScheduledRounds';
+import { BookingParseError, reconstructRoundingInfo } from './lib/bookingParser';
+import { findKnownCourse, findKnownLandmark, SEOUL_CITY_HALL } from './lib/knownCourses';
+import { calculateDistanceKm, estimateTravelMinutes } from './lib/travelEstimate';
 
-// 하버사인 공식 (거리 계산) - Fallback용
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return calculateDistanceKm(lat1, lon1, lat2, lon2);
+}
+
+function scrollToId(id: string) {
+  window.setTimeout(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
+}
+
+async function resolveStartCoords(location: string, saved?: GeoLocation | null): Promise<GeoLocation> {
+  if (saved?.lat && saved?.lng) {
+    return { lat: saved.lat, lng: saved.lng, address: saved.address || location };
+  }
+
+  try {
+    const geo = await getGeocode(location);
+    if (geo) return geo;
+  } catch (error) {
+    console.warn('[resolveStartCoords] geocode failed', error);
+  }
+
+  try {
+    const search = await searchLocation(location);
+    if (search) return search;
+  } catch (error) {
+    console.warn('[resolveStartCoords] search failed', error);
+  }
+
+  const landmark = findKnownLandmark(location);
+  if (landmark) return landmark;
+  return { ...SEOUL_CITY_HALL };
+}
+
+function ensureCourseCoords(info: RoundingInfo): RoundingInfo {
+  if (info.lat && info.lng) return info;
+  const known = findKnownCourse(`${info.golfCourse} ${info.address || ''}`);
+  if (!known) return info;
+  return {
+    ...info,
+    lat: known.lat,
+    lng: known.lng,
+    address: info.address || known.address,
+    phoneNumber: info.phoneNumber || known.phoneNumber,
+    homepage: info.homepage || known.homepage,
+  };
 }
 
 const App: React.FC = () => {
@@ -41,6 +78,8 @@ const App: React.FC = () => {
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [startCoords, setStartCoords] = useState<{ lat: number, lng: number, address: string } | null>(null);
   const [scheduledRounds, setScheduledRounds] = useState<RoundingPlan[]>([]);
+  const [roundsHydrated, setRoundsHydrated] = useState(false);
+  const [extrasReady, setExtrasReady] = useState(false);
 
   // State for Breakfast Menu Selection
   const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
@@ -107,123 +146,142 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error('[LocalStorage] Load failed:', e);
+    } finally {
+      setRoundsHydrated(true);
     }
   }, []);
 
   // 2. 라운딩 목록이 바뀔 때마다 핸드폰에 자동 저장
   React.useEffect(() => {
-    if (scheduledRounds.length > 0) {
-      localStorage.setItem('myGolfRounds', JSON.stringify(scheduledRounds));
-      console.log('[LocalStorage] Saved rounds:', scheduledRounds.length);
-    }
-  }, [scheduledRounds]);
+    if (!roundsHydrated) return;
+    localStorage.setItem('myGolfRounds', JSON.stringify(scheduledRounds));
+    console.log('[LocalStorage] Saved rounds:', scheduledRounds.length);
+  }, [scheduledRounds, roundsHydrated]);
 
-  const handleAnalyze = async (message: string, location: string, customPrep: number) => {
+  const openDeparturePlan = async (
+    infoInput: RoundingInfo,
+    startLoc: string,
+    customPrep: number,
+    savedStartCoords?: GeoLocation | null,
+  ) => {
+    const info = ensureCourseCoords({ ...infoInput });
+    const courseAssets = getGolfCourseAssets(info.golfCourse);
+    info.logoUrl = info.logoUrl || courseAssets.logo;
+
+    setPrepTime(customPrep);
+    setCurrentStartLocation(startLoc);
+    setWeatherData([]);
+    setRestaurants([]);
+    setVideos([]);
+    setTravelTime(null);
+    setSelectedRestaurant(null);
+    setSelectedMenus([]);
+    setIsMenuConfirmed(false);
+    setExtrasReady(false);
+    setLogoError(false);
+
+    const coords = await resolveStartCoords(startLoc, savedStartCoords);
+    setStartCoords(coords);
+    if (coords.address) setCurrentStartLocation(coords.address);
+
+    try {
+      const verifiedLocation = await searchGolfCourseLocation(info.golfCourse);
+      if (verifiedLocation) {
+        info.address = verifiedLocation.address || info.address;
+        info.lat = verifiedLocation.lat || info.lat;
+        info.lng = verifiedLocation.lng || info.lng;
+      }
+    } catch (error) {
+      console.warn('[openDeparturePlan] course search skipped', error);
+    }
+
+    try {
+      const golfCoords = await getGeocode(info.address || info.golfCourse);
+      if (golfCoords) {
+        info.lat = golfCoords.lat;
+        info.lng = golfCoords.lng;
+        info.address = golfCoords.address || info.address;
+      }
+    } catch (error) {
+      console.warn('[openDeparturePlan] course geocode skipped', error);
+    }
+
+    const resolved = ensureCourseCoords(info);
+    setRoundingInfo(resolved);
+
+    let directTime = 0;
+    if (coords && resolved.lat && resolved.lng) {
+      try {
+        const route = await getRoute(coords, { lat: resolved.lat, lng: resolved.lng });
+        if (route) {
+          directTime = Math.round(route.summary.duration / 60000);
+        }
+      } catch (error) {
+        console.warn('[openDeparturePlan] route API skipped', error);
+      }
+    }
+    if (!directTime) {
+      directTime = estimateTravelMinutes(coords, resolved);
+    }
+    setTravelTime(directTime);
+
+    try {
+      const [weather, videosData] = await Promise.all([
+        fetchWeather(resolved),
+        fetchCourseVideos(resolved.golfCourse),
+      ]);
+      setWeatherData(weather);
+      setVideos(videosData);
+    } catch (error) {
+      console.warn('[openDeparturePlan] extras skipped', error);
+      setWeatherData([]);
+      setVideos([]);
+    } finally {
+      setExtrasReady(true);
+    }
+
+    return { info: resolved, coords, startLoc };
+  };
+
+  const handleAnalyze = async ({ message, startLocation: location, prepTime: customPrep, manual }: AnalyzeRequest) => {
     setLoading(true);
     setError(null);
     setPrepTime(customPrep);
 
-    // Default to '서울 시청' if location is empty to ensure map route works
     const finalLocation = location.trim() || '서울 시청';
     setCurrentStartLocation(finalLocation);
 
-    setWeatherData([]);
-    setRestaurants([]);
-    setTravelTime(null);
-    setSelectedRestaurant(null);
-    setRestaurants([]);
-    setTravelTime(null);
-    setSelectedRestaurant(null);
-    setStartCoords(null);
-
-    // Reset Menu Selection State
-    setSelectedMenus([]);
-    setIsMenuConfirmed(false);
-
     try {
-      const info = await parseBookingMessage(message);
+      const info = await parseBookingMessage(message, manual);
+      const { info: resolved, coords } = await openDeparturePlan(info, finalLocation, customPrep);
 
-      // 1. 검색을 통해 정확한 유효 골프장 정보 확보 (이름 -> 주소 -> 좌표 확보)
-      console.log(`[handleAnalyze] Verifying location for: ${info.golfCourse}`);
-      const verifiedLocation = await searchGolfCourseLocation(info.golfCourse);
-
-      if (verifiedLocation) {
-        info.address = verifiedLocation.address;
-        info.lat = verifiedLocation.lat;
-        info.lng = verifiedLocation.lng;
-        console.log(`[handleAnalyze] Location Verified through search: ${info.address} (${info.lat}, ${info.lng})`);
-      }
-
-      // 2. 출발지 좌표 정보 정밀 획득 (검색 API 활용하여 더 정확한 랜드마크 탐색)
-      let refinedStartLocation = finalLocation;
-      // location이 모호한 경우(예: '서울'), 검색을 통해 구체적인 랜드마크(예: '서울시청')를 찾도록 유도
-      if (finalLocation && finalLocation.length < 5) {
-        const locationResult = await searchGolfCourseLocation(finalLocation); // 이름은 GolfCourseLocation이나 일반 장소 검색도 가능
-        if (locationResult) {
-          console.log(`[StartLocation] Refined '${finalLocation}' to '${locationResult.address}' via Search API`);
-          // 좌표도 함께 반환되므로 바로 사용 가능
-          refinedStartLocation = locationResult.address;
-        }
-      }
-
-      const [coords, golfCoords] = await Promise.all([
-        getGeocode(refinedStartLocation),
-        getGeocode(info.address || info.golfCourse)
-      ]);
-
-      setStartCoords(coords);
-
-      // 🎯 지오코딩으로 찾은 정확한 주소로 업데이트
-      if (coords && coords.address) {
-        console.log(`[StartLocation] Updated from '${refinedStartLocation}' to '${coords.address}'`);
-        setCurrentStartLocation(coords.address); // 정확한 주소로 업데이트
-      }
-
-      // 네이버 지오코딩으로 찾은 좌표가 있으면 최종 적용 (검색 결과보다 지오코딩이 구체적 주소일 때 유리)
-      if (golfCoords) {
-        info.lat = golfCoords.lat;
-        info.lng = golfCoords.lng;
-        info.address = golfCoords.address || info.address; // 검색보다 더 정확한 지보명칭이 있을 수 있음
-      }
-
-      // Override AI-generated images with reliable static images
-      const courseAssets = getGolfCourseAssets(info.golfCourse);
-      info.logoUrl = courseAssets.logo;
-
-      setRoundingInfo(null); // Clear previous results so we don't show them immediately
-      setWeatherData([]);
-      setRoundingInfo(null); // Clear previous results so we don't show them immediately
-      setWeatherData([]);
-      setRestaurants([]); // Ensure restaurants are cleared
-      setVideos([]);
-      setVideos([]);
-
-      // Save to scheduled rounds
       const newRound: RoundingPlan = {
         id: Date.now().toString(),
-        golfCourse: info.golfCourse,
-        date: info.date,
-        time: info.teeOffTime,
-        members: 4,
-        location: info.address || '위치 정보 확인 중',
-        startLocation: finalLocation, // 사용자가 입력한 출발지 저장
-        startCoords: coords, // Use fetched coords directly (state update is async)
-        fullInfo: info // Save the full analyzed info
+        golfCourse: resolved.golfCourse,
+        date: resolved.date,
+        time: resolved.teeOffTime,
+        members: resolved.members || 4,
+        location: resolved.address || '위치 정보 확인 중',
+        startLocation: finalLocation,
+        startCoords: coords,
+        prepTime: customPrep,
+        fullInfo: resolved,
       };
 
       setScheduledRounds(prev => {
         if (prev.some(r => r.date === newRound.date && r.time === newRound.time && r.golfCourse === newRound.golfCourse)) {
-          return prev;
+          return prev.map(r =>
+            r.date === newRound.date && r.time === newRound.time && r.golfCourse === newRound.golfCourse
+              ? { ...r, ...newRound, id: r.id }
+              : r
+          );
         }
         return [newRound, ...prev];
       });
-
-      setLoading(false);
-      // Removed immediate fetching of weather, restaurants, videos
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError("정보를 분석하는 중 오류가 발생했습니다.");
+      setError(err instanceof BookingParseError ? err.message : '예약 문구를 읽지 못했습니다. 직접 입력으로 출발 계획을 만들 수 있습니다.');
+    } finally {
       setLoading(false);
     }
   };
@@ -352,7 +410,21 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-20 selection:bg-emerald-500 selection:text-white">
-      <Header />
+      <Header onNavigate={(target) => {
+        if (target === 'service') {
+          setRoundingInfo(null);
+          scrollToId('booking');
+        } else if (target === 'analytics') {
+          if (roundingInfo) {
+            scrollToId('schedule');
+          } else {
+            scrollToId('rounds');
+          }
+        } else {
+          if (!roundingInfo) scrollToId('vault');
+          else scrollToId('vault');
+        }
+      }} />
 
       <main className="max-w-md mx-auto px-4 py-8 space-y-10">
         {!roundingInfo && !loading && (
@@ -367,125 +439,63 @@ const App: React.FC = () => {
               </div>
               <BookingForm onAnalyze={handleAnalyze} loading={loading} />
 
+              <div id="rounds">
               <ScheduledRounds
                 rounds={scheduledRounds}
                 onDelete={(id) => setScheduledRounds(prev => prev.filter(r => r.id !== id))}
                 onUpdate={(id, updates) => {
                   console.log('[ScheduledRounds] Updating round:', id, 'with:', updates);
                   setScheduledRounds(prev => {
-                    const updated = prev.map(r => r.id === id ? { ...r, ...updates } : r);
+                    const updated = prev.map(r => {
+                      if (r.id !== id) return r;
+                      const next = { ...r, ...updates };
+                      if (next.fullInfo) {
+                        next.fullInfo = {
+                          ...next.fullInfo,
+                          date: updates.date || next.fullInfo.date,
+                          teeOffTime: updates.time || next.fullInfo.teeOffTime,
+                          address: updates.startLocation ? next.fullInfo.address : next.fullInfo.address,
+                        };
+                      }
+                      return next;
+                    });
                     console.log('[ScheduledRounds] Updated rounds:', updated);
                     return updated;
                   });
                 }}
                 onView={async (round) => {
-                  if (!round.fullInfo) {
-                    setError("라운드 상세 정보를 불러올 수 없습니다.");
-                    return;
-                  }
-
                   setLoading(true);
                   setError(null);
-                  setLogoError(false);
-                  setWeatherData([]);
-                  setRestaurants([]);
-                  setTravelTime(null);
-                  setSelectedRestaurant(null);
-                  setVideos([]);
-
-                  const info = round.fullInfo;
-                  setRoundingInfo(info); // Set this to show the dashboard
-
-                  // Use the saved startLocation from the round, fallback to default
-                  const startLoc = round.startLocation || '서울 시청';
-                  console.log('[onView] Using startLocation:', startLoc, 'from round:', round);
-                  setCurrentStartLocation(startLoc); // Update global state to match
-
                   try {
-                    // 🔥 저장된 좌표 우선 사용 (재검색 완전 방지)
-                    let coords = round.startCoords || startCoords;
+                    const info = reconstructRoundingInfo({
+                      golfCourse: round.golfCourse,
+                      date: round.date,
+                      time: round.time,
+                      location: round.location,
+                      fullInfo: round.fullInfo,
+                    });
+                    const startLoc = round.startLocation || '서울 시청';
+                    const opened = await openDeparturePlan(info, startLoc, round.prepTime ?? prepTime, round.startCoords);
 
-                    // 저장된 좌표가 전혀 없는 경우에만 재검색
-                    if (!coords) {
-                      console.log(`[onView] No saved coordinates, fetching for: ${startLoc}`);
-                      coords = await getGeocode(startLoc);
-
-                      // 2. Geocoding 실패 시 Search API 시도 (POI 검색)
-                      if (!coords) {
-                        console.log(`[onView] Geocoding failed, trying Search API for: ${startLoc}`);
-                        coords = await searchLocation(startLoc);
-                      }
-
-                      // Fallback: 둘 다 실패 시에만 기본 좌표 사용
-                      if (!coords) {
-                        console.warn(`[onView] All location searches failed for '${startLoc}', using fallback coordinates`);
-                        // 서울시청 기본 좌표
-                        coords = {
-                          lat: 37.5663,
-                          lng: 126.9779,
-                          address: '서울특별시 중구 태평로1가 31'
-                        };
-                      }
-                    } else {
-                      console.log(`[onView] ✅ Using saved coordinates for: ${startLoc}`, coords);
-                    }
-
-                    setStartCoords(coords);
-
-                    // 1. Calculate Direct Travel Time (Robust Logic)
-                    let directTime = 0;
-
-                    // A. Try Naver API
-                    if (coords && info.lat && info.lng) {
-                      try {
-                        const route = await getRoute(coords, { lat: info.lat, lng: info.lng });
-                        if (route) {
-                          directTime = Math.round(route.summary.duration / 60000);
-                        }
-                      } catch (e) { console.warn("Direct Route API warning:", e) }
-                    }
-
-                    // B. Fallback Math if API failed or no time
-                    if (!directTime) {
-                      const sLat = coords?.lat || 37.5665;
-                      const sLng = coords?.lng || 126.9780;
-                      const gLat = info.lat || sLat;
-                      const gLng = info.lng || sLng;
-
-                      const distRaw = calculateDistance(sLat, sLng, gLat, gLng);
-                      const distEst = distRaw * 1.3;
-
-                      const getSpeed = (dist: number) => {
-                        if (dist >= 50) return 80;
-                        if (dist >= 20) return 60;
-                        return 30;
-                      };
-                      const speed = getSpeed(distEst);
-                      directTime = Math.round((distEst / speed) * 60 + 5);
-                      console.log(`[DirectTime Fallback] Dist: ${distEst.toFixed(1)}km, Speed: ${speed}km/h, Time: ${directTime}m`);
-                    }
-
-                    // Fetch other details (Weather, Videos) - Restaurants deferred until menu selection
-                    const [weather, videosData] = await Promise.all([
-                      fetchWeather(info),
-                      // fetchRestaurants(info, startLoc, coords), // DEFERRED
-                      fetchCourseVideos(info.golfCourse)
-                    ]);
-
-                    setTravelTime(directTime); // Set calculated time
-                    setWeatherData(weather);
-                    setRestaurants([]); // Clear restaurants since we defer fetching
-                    setVideos(videosData);
-                    console.log('[Videos] Fetched videos:', videosData.length, videosData);
-
+                    setScheduledRounds(prev => prev.map(r => r.id === round.id ? {
+                      ...r,
+                      fullInfo: opened.info,
+                      startCoords: opened.coords,
+                      location: opened.info.address || r.location,
+                    } : r));
                   } catch (err) {
                     console.error("Failed to load round details:", err);
-                    setError("라운드 상세 정보를 불러오는 중 오류가 발생했습니다.");
+                    setError(err instanceof BookingParseError ? err.message : "라운드 상세 정보를 불러오는 중 오류가 발생했습니다.");
                   } finally {
                     setLoading(false);
                   }
                 }}
               />
+              </div>
+
+              <div id="vault">
+                <FavoriteSites />
+              </div>
 
               {/* <EliteServicesSection /> */}
 
@@ -562,7 +572,7 @@ const App: React.FC = () => {
 
             {/* Weather Section - Moved above route */}
             {
-              weatherData.length > 0 ? (
+              extrasReady ? (
                 <WeatherSection data={weatherData} />
               ) : (
                 <div className="luxury-glass p-12 rounded-3xl border luxury-border flex flex-col items-center justify-center animate-pulse">
@@ -574,7 +584,7 @@ const App: React.FC = () => {
 
             {/* Map & Timeline Vertical Layout */}
             <div className="space-y-12">
-              <div className="w-full">
+              <div className="w-full" id="schedule">
                 {travelTime !== null ? (
                   <ScheduleSection
                     roundingInfo={roundingInfo}
@@ -668,7 +678,13 @@ const App: React.FC = () => {
                 </h2>
               </div>
 
-              {videos.length > 0 ? (
+              {extrasReady && videos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <i className="fa-brands fa-youtube text-slate-700 text-6xl mb-4"></i>
+                  <p className="text-slate-400 font-bold mb-2">코스 공략 영상을 찾지 못했습니다.</p>
+                  <p className="text-slate-500 text-sm">출발 계획과 별개로 나중에 다시 확인할 수 있습니다.</p>
+                </div>
+              ) : videos.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
                   {videos.map((video, idx) => (
                     <a
@@ -731,7 +747,7 @@ const App: React.FC = () => {
 
             {/* <EliteServicesSection /> */}
 
-            <div id="favorite-sites-section">
+            <div id="vault">
               <FavoriteSites />
             </div>
 

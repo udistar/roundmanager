@@ -26,5 +26,27 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "App.tsx",
+    "index.tsx",
+    "types.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "components/**/*.tsx",
+    "constants/**/*.ts",
+    "lib/**/*.ts",
+    "netlify/functions/**/*.ts",
+    "services/**/*.ts",
+    "src/app/globals.css"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "src/app/**/*.tsx",
+    "src/components/**/*",
+    "src/lib/**/*",
+    "next.config.ts",
+    "android"
+  ]
 }

@@ -13,6 +13,7 @@ export interface RoundingPlan {
     location: string;
     startLocation?: string; // 출발지 정보 추가
     startCoords?: { lat: number; lng: number; address?: string }; // 출발지 좌표 추가
+    prepTime?: number;
     fullInfo?: RoundingInfo;
 }
 

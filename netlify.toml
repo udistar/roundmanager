@@ -2,6 +2,9 @@
   command = "npm run build"
   publish = "dist"
 
+[functions]
+  directory = "netlify/functions"
+
 [build.environment]
   # Disable secrets scanning because it incorrectly flags public client-side API keys
   SECRETS_SCAN_ENABLED = "false"
