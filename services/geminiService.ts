@@ -14,16 +14,23 @@ export async function parseBookingMessage(message: string, manual?: ManualBookin
   let parsed: RoundingInfo | null = null;
 
   try {
-    const response = await fetch('/api/parse-booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, manual }),
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (data?.ok && data.info?.golfCourse && data.info?.date && data.info?.teeOffTime) {
-        parsed = enrichWithKnownCourse(mergeManualOverrides(data.info, manual));
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch('/api/parse-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, manual }),
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.ok && data.info?.golfCourse && data.info?.date && data.info?.teeOffTime) {
+          parsed = enrichWithKnownCourse(mergeManualOverrides(data.info, manual));
+        }
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   } catch (error) {
     console.warn('[parseBookingMessage] Server parser unavailable, using local parser', error);
@@ -70,15 +77,19 @@ export async function parseBookingMessage(message: string, manual?: ManualBookin
         const naverName = item.title.replace(/<[^>]*>?/gm, '');
 
         // 🔥 Naver Geocoding API를 사용하여 정확한 좌표 획득
-        const geo = await getGeocode(naverAddress);
-        if (geo) {
+        const knownCourse = findKnownCourse(parsed.golfCourse);
+        const geo = knownCourse ? null : await getGeocode(naverAddress);
+        if (knownCourse) {
+          parsed.address = parsed.address || knownCourse.address;
+          parsed.lat = parsed.lat || knownCourse.lat;
+          parsed.lng = parsed.lng || knownCourse.lng;
+        } else if (geo) {
           parsed.address = geo.address;
           parsed.lat = geo.lat;
           parsed.lng = geo.lng;
           console.log(`[Naver Search Override] ✅ Final Coords: (${geo.lat}, ${geo.lng})`);
         } else {
-          // Geocode 실패 시 Search API 데이터라도 사용 (좌표는 0이 될 수 있으므로 주의)
-          parsed.address = naverAddress;
+          parsed.address = parsed.address || naverAddress;
           console.warn(`[Naver Search Override] ⚠️ Geocoding failed, using Search API address only.`);
         }
 

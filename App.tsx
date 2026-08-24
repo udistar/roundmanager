@@ -184,26 +184,33 @@ const App: React.FC = () => {
     setStartCoords(coords);
     if (coords.address) setCurrentStartLocation(coords.address);
 
-    try {
-      const verifiedLocation = await searchGolfCourseLocation(info.golfCourse);
-      if (verifiedLocation) {
-        info.address = verifiedLocation.address || info.address;
-        info.lat = verifiedLocation.lat || info.lat;
-        info.lng = verifiedLocation.lng || info.lng;
+    const knownCourse = findKnownCourse(`${info.golfCourse} ${info.address || ''}`);
+    if (!knownCourse) {
+      try {
+        const verifiedLocation = await searchGolfCourseLocation(info.golfCourse);
+        if (verifiedLocation) {
+          info.address = verifiedLocation.address || info.address;
+          info.lat = verifiedLocation.lat || info.lat;
+          info.lng = verifiedLocation.lng || info.lng;
+        }
+      } catch (error) {
+        console.warn('[openDeparturePlan] course search skipped', error);
       }
-    } catch (error) {
-      console.warn('[openDeparturePlan] course search skipped', error);
-    }
 
-    try {
-      const golfCoords = await getGeocode(info.address || info.golfCourse);
-      if (golfCoords) {
-        info.lat = golfCoords.lat;
-        info.lng = golfCoords.lng;
-        info.address = golfCoords.address || info.address;
+      try {
+        const golfCoords = await getGeocode(info.address || info.golfCourse);
+        if (golfCoords) {
+          info.lat = golfCoords.lat;
+          info.lng = golfCoords.lng;
+          info.address = golfCoords.address || info.address;
+        }
+      } catch (error) {
+        console.warn('[openDeparturePlan] course geocode skipped', error);
       }
-    } catch (error) {
-      console.warn('[openDeparturePlan] course geocode skipped', error);
+    } else {
+      info.address = info.address || knownCourse.address;
+      info.lat = info.lat || knownCourse.lat;
+      info.lng = info.lng || knownCourse.lng;
     }
 
     const resolved = ensureCourseCoords(info);
@@ -413,6 +420,8 @@ const App: React.FC = () => {
       <Header onNavigate={(target) => {
         if (target === 'service') {
           setRoundingInfo(null);
+          setLoading(false);
+          setExtrasReady(false);
           scrollToId('booking');
         } else if (target === 'analytics') {
           if (roundingInfo) {
@@ -560,6 +569,9 @@ const App: React.FC = () => {
                     setRestaurants([]);
                     setIsMenuConfirmed(false);
                     setSelectedMenus([]);
+                    setLoading(false);
+                    setExtrasReady(false);
+                    setError(null);
                   }}
                   className="w-full py-4 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-all font-bold text-sm"
                 >
