@@ -1,91 +1,50 @@
 import axios from 'axios';
-import { GoogleGenAI, Type } from "@google/genai";
 import { RoundingInfo, WeatherData, Restaurant } from "../types";
 import { getGeocode, SEARCH_PROXY_BASE } from './naverService';
+import {
+  enrichWithKnownCourse,
+  mergeManualOverrides,
+  parseBookingLocally,
+  type ManualBookingFields,
+} from '../lib/bookingParser';
+import { findKnownCourse } from '../lib/knownCourses';
 
-const ai = new GoogleGenAI({ apiKey: (import.meta.env.VITE_GEMINI_API_KEY || '') as string });
+// 1. 예약 메시지 파싱: 서버 AI가 있으면 사용하고, 실패하면 로컬 파서가 이어간다.
+export async function parseBookingMessage(message: string, manual?: ManualBookingFields): Promise<RoundingInfo> {
+  let parsed: RoundingInfo | null = null;
 
-// 1. 예약 메시지 파싱 및 상세 코스 정보 추출
-export async function parseBookingMessage(message: string): Promise<RoundingInfo> {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp",
-    contents: `Extract golf rounding info from: "${message}". 
-    
-    🚨 **ULTRA-STRICT VERIFICATION MANDATE** 🚨
-    **STEP 1**: Search for the OFFICIAL website of "${message}". BEWARE of unofficial booking directories. 
-    **STEP 2**: Verify the URL (homepage). Must be the direct club domain (e.g., club72.com). PREFER the root domain or main landing page. AVOID deep mobile links like /m/index.asp which might be dead.
-    **STEP 3**: Cross-check the REAL current address and official phone number.
-    **STEP 4**: Extract REAL business data: Green Fee, Cart Fee, Caddie Fee. Must be from the current season.
-    **STEP 5**: Find the ACTUAL hero image from the official site.
-    
-    **REQUIRED DATA**:
-    1. Verified Official Website URL (homepage) - MUST BE THE STABLE ROOT OR MAIN PAGE.
-    2. Official Phone Number (phoneNumber)
-    3. Clubhouse/Course Main Image URL (previewImageUrl)
-    
-    Return JSON: {golfCourse, address, date, teeOffTime, logoUrl, lat, lng, courseScale, grassInfo, yardage: {in, out}, courseRating, greenFee, cartFee, caddieFee, phoneNumber, homepage, amenities: [], previewImageUrl}.
-    **NO HALLUCINATION**: If the official homepage cannot be found with 99% certainty, return null for that field. ALL TEXT IN KOREAN.`,
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          golfCourse: { type: Type.STRING },
-          address: { type: Type.STRING },
-          date: { type: Type.STRING },
-          teeOffTime: { type: Type.STRING },
-          logoUrl: { type: Type.STRING },
-          lat: { type: Type.NUMBER },
-          lng: { type: Type.NUMBER },
-          courseScale: { type: Type.STRING },
-          grassInfo: { type: Type.STRING },
-          yardage: {
-            type: Type.OBJECT,
-            properties: {
-              in: { type: Type.STRING },
-              out: { type: Type.STRING }
-            }
-          },
-          courseRating: { type: Type.STRING },
-          greenFee: { type: Type.STRING },
-          cartFee: { type: Type.STRING },
-          caddieFee: { type: Type.STRING },
-          phoneNumber: { type: Type.STRING },
-          homepage: { type: Type.STRING },
-          amenities: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-          },
-          previewImageUrl: { type: Type.STRING }
-        },
-        required: ["golfCourse", "date", "teeOffTime", "lat", "lng", "homepage"],
-      },
-    },
-  });
-
-  console.log('[parseBookingMessage] Raw API Response:', response);
-  console.log('[parseBookingMessage] Response Text:', response.text);
-
-  let text = response.text;
-  const jsonMatch = text.match(/\{.*\}/s);
-  if (jsonMatch) {
-    text = jsonMatch[0];
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch('/api/parse-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, manual }),
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.ok && data.info?.golfCourse && data.info?.date && data.info?.teeOffTime) {
+          parsed = enrichWithKnownCourse(mergeManualOverrides(data.info, manual));
+        }
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error) {
+    console.warn('[parseBookingMessage] Server parser unavailable, using local parser', error);
   }
 
-  console.log('[parseBookingMessage] Extracted JSON Text:', text);
-  const parsed = JSON.parse(text);
-  console.log('[parseBookingMessage] Parsed Object:', parsed);
+  if (!parsed) {
+    parsed = parseBookingLocally(message, manual);
+  }
 
-  // URL 검증: 도메인이 아닌 텍스트가 들어오는지 확인
   if (parsed.homepage && !parsed.homepage.startsWith('http')) {
-    console.warn(`[Verification] Homepage link invalid format: ${parsed.homepage}`);
-    parsed.homepage = null;
+    parsed.homepage = undefined;
   }
 
-  console.log(`[Golf Course Analysis] Verified Homepage: ${parsed.homepage}`);
-
-  // 🔥 Gemini 데이터를 완전히 무시하고 네이버 검색 API로 정확한 정보 확보
+  // 네이버 검색은 보강만 하고, 실패해도 로컬 결과를 유지한다.
   if (parsed.golfCourse) {
     try {
       const axios = (await import('axios')).default;
@@ -118,20 +77,23 @@ export async function parseBookingMessage(message: string): Promise<RoundingInfo
         const naverName = item.title.replace(/<[^>]*>?/gm, '');
 
         // 🔥 Naver Geocoding API를 사용하여 정확한 좌표 획득
-        const geo = await getGeocode(naverAddress);
-        if (geo) {
+        const knownCourse = findKnownCourse(parsed.golfCourse);
+        const geo = knownCourse ? null : await getGeocode(naverAddress);
+        if (knownCourse) {
+          parsed.address = parsed.address || knownCourse.address;
+          parsed.lat = parsed.lat || knownCourse.lat;
+          parsed.lng = parsed.lng || knownCourse.lng;
+        } else if (geo) {
           parsed.address = geo.address;
           parsed.lat = geo.lat;
           parsed.lng = geo.lng;
           console.log(`[Naver Search Override] ✅ Final Coords: (${geo.lat}, ${geo.lng})`);
         } else {
-          // Geocode 실패 시 Search API 데이터라도 사용 (좌표는 0이 될 수 있으므로 주의)
-          parsed.address = naverAddress;
+          parsed.address = parsed.address || naverAddress;
           console.warn(`[Naver Search Override] ⚠️ Geocoding failed, using Search API address only.`);
         }
 
-        // 골프장 이름도 네이버 결과로 교체 (더 정확할 수 있음)
-        if (naverName && naverName.length > 0) {
+        if (naverName && naverName.length > 0 && !findKnownCourse(parsed.golfCourse)) {
           parsed.golfCourse = naverName;
         }
       } else {
@@ -147,108 +109,14 @@ export async function parseBookingMessage(message: string): Promise<RoundingInfo
   return parsed;
 }
 
-// 2. 이동 시간만 빠르게 계산
-export async function fetchTravelTime(start: string, destination: string): Promise<number> {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp",
-    contents: `Estimate driving minutes from "${start}" to "${destination}" in Korea. Return only the integer number.`,
-    config: {
-      tools: [{ googleSearch: {} }],
-    },
-  });
-  const match = response.text.match(/\d+/);
-  return match ? parseInt(match[0]) : 60;
+// 2. 이동 시간만 빠르게 계산 (AI 없이 안전한 기본값)
+export async function fetchTravelTime(_start: string, _destination: string): Promise<number> {
+  return 70;
 }
 
-// 3. 날씨 정보 가져오기 (3개사 소스 복구 및 최적화)
-export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
-  const cleanCourse = info.golfCourse.replace(/(CC|GC|클럽|골프장|리조트)/g, '').trim();
-  const prompt = `Search for the weather forecast for ${cleanCourse} (${info.address || ''}) on ${info.date} starting ${info.teeOffTime}.
-  Use Google Search to find data from: 1.KMA 2.AccuWeather 3.yr.no.
-  
-  **CRITICAL**: Return JSON ONLY.
-  1. If exact data is missing, ESTIMATE based on season/local climate. **DO NOT return "정보 없음" or "Unknown".**
-  2. "temp": Simple number + unit (e.g. "-5°C").
-  3. "wind": Speed + Dir (e.g. "3m/s 서").
-  4. "precip": Amount + Prob (e.g. "0mm(0%)").
-  5. "condition": Short keyword (맑음, 흐림, 눈).
-  6. "hourly": 6 data points.
-  
-  Return JSON Array of 3 objects.
-  Schema: [{source, temperature, wind, precipitation, condition, nowcast, hourly: [{time, temp, condition, precip, wind}]}]`;
-
-  const sources = ["기상청(KMA)", "AccuWeather", "yr.no (노르웨이 기상청)"];
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          minItems: 3,
-          maxItems: 3,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              source: { type: Type.STRING },
-              temperature: { type: Type.STRING },
-              wind: { type: Type.STRING },
-              precipitation: { type: Type.STRING },
-              condition: { type: Type.STRING },
-              nowcast: { type: Type.STRING },
-              hourly: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    time: { type: Type.STRING },
-                    temp: { type: Type.STRING },
-                    condition: { type: Type.STRING },
-                    precip: { type: Type.STRING },
-                    wind: { type: Type.STRING },
-                  },
-                },
-              },
-            },
-            required: ["source", "temperature", "condition", "hourly"],
-          },
-        },
-      },
-    });
-
-    let text = response.text;
-    const jsonStart = text.indexOf('[');
-    const jsonEnd = text.lastIndexOf(']');
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      text = text.substring(jsonStart, jsonEnd + 1);
-    }
-
-    let data = JSON.parse(text);
-
-    // Fallback/Validation
-    if (!data || data.length === 0) return [];
-
-    return data.map((item: any, idx: number) => {
-      // Ensure source name is correct if missing
-      if (!item.source) item.source = sources[idx];
-
-      // Sanitize fields to prevent UI overflow
-      if (item.wind && item.wind.length > 15) item.wind = item.wind.substring(0, 15);
-      if (item.hourly) {
-        item.hourly.forEach((h: any) => {
-          if (h.wind && h.wind.length > 10) h.wind = h.wind.substring(0, 10);
-        });
-      }
-      return item;
-    });
-
-  } catch (err: any) {
-    console.error("Weather Fetch Failed Detail:", err?.message || err);
-    return [];
-  }
+// 3. 날씨 정보 — 클라이언트에서 Gemini 키를 쓰지 않는다. 실패해도 출발 계획을 막지 않는다.
+export async function fetchWeather(_info: RoundingInfo): Promise<WeatherData[]> {
+  return [];
 }
 
 
@@ -473,22 +341,7 @@ export async function fetchRestaurants(info: RoundingInfo, _startLocation: strin
           }
         }
 
-        let verifiedMenus = [{ name: "메뉴 정보", price: "네이버 플레이스 참조" }];
-        if (isTopThree) {
-          try {
-            await sleep(500); // 추가 대기
-            const menuPrompt = `Representative menu for "${name}" at "${finalAddress}". Return JSON array: [{"name": "item", "price": "15,000원"}]. EXACTLY 2 items. Use Korean currency format (e.g. 15,000원).`;
-            const menuResponse = await ai.models.generateContent({
-              model: "gemini-2.0-flash-exp",
-              contents: menuPrompt,
-              config: { tools: [{ googleSearch: {} }] }
-            });
-            const jsonMatch = menuResponse.text.match(/\[.*\]/s);
-            if (jsonMatch) verifiedMenus = JSON.parse(jsonMatch[0]);
-          } catch (e) {
-            console.warn("Menu AI Prompt failed (rate limit?):", e);
-          }
-        }
+        const verifiedMenus = [{ name: "메뉴 정보", price: "네이버 플레이스 참조" }];
 
         items.push({
           name,
@@ -698,115 +551,9 @@ export async function fetchRestaurants(info: RoundingInfo, _startLocation: strin
 }
 
 
-// 5. 유튜브 코스 공략 영상 가져오기
+// 5. 유튜브 코스 공략 영상 — 클라이언트 Gemini 호출 없이 로컬 폴백만 사용
 export async function fetchCourseVideos(golfCourse: string): Promise<any[]> {
-  const prompt = `
-  🚨🚨🚨 ZERO TOLERANCE FOR HALLUCINATED VIDEO IDs 🚨🚨🚨
-  **READ CAREFULLY: USER IS WATCHING DELETED VIDEOS. DO NOT GENERATE RANDOM IDs.**
-  
-  **INSTRUCTIONS:**
-  1. 🔍 **SEARCH YOUTUBE**: Find the top 3-5 RECENT and PLAYABLE videos for "${golfCourse} 코스 공략".
-  2. ✅ **VERIFY VIDEO ID**: Copy exactly from search results. Format MUST be https://www.youtube.com/watch?v=VIDEO_ID.
-  3. ❌ **NO FAKE IDs**: If you can't find a video for the specific course, search for close matches or return empty list.
-  
-  **GROUND TRUTH (USE THESE EXACTLY IF COURSE MATCHES):**
-  If searching for Bear Creek Chuncheon (베어크리크 춘천):
-  - "춘천베어크리크 l KPGA l 투어프로 l 코스공략" (https://www.youtube.com/watch?v=5n7Ud_7tScQ)
-  - "베어크리크 춘천 Out 코스 (1~9번홀) 공략" (https://www.youtube.com/watch?v=UE1guOc8tgs)
-  - "베어크리크 춘천 In코스 (10~18번홀) 공략" (https://www.youtube.com/watch?v=nv51w3RslX4)
-  
-  If searching for Shilla CC (신라CC):
-  - "신라CC 남코스 5분 코스 공략 가이드" (https://www.youtube.com/watch?v=7h7K6n5t7h4)
-  - "여주 신라CC 서코스 코스공략 가이드" (https://www.youtube.com/watch?v=fN7Y7x6tW6Y)
-  - "신라CC 동코스 공략 l 리보플TV" (https://www.youtube.com/watch?v=T9i7Vb_y_9s)
-
-  If searching for Bear Creek Pocheon (베어크리크 포천):
-  - "[4k] 베어크리크 포천 크리크 코스 라운드 l 코스 공략" (https://www.youtube.com/watch?v=PuNox-yUk0U)
-  - "[4k] 베어크리크 포천 베어코스 라운드 l 공략법" (https://www.youtube.com/watch?v=x4D6jeBuZCI)
-  - "포천 베어크리크GC 크리크 Out코스 (1~9번) 5분 공략" (https://www.youtube.com/watch?v=HiBmHa14NxE)
-  
-  **REQUIRED DATA PER VIDEO:**
-  - title: Exact video title
-  - channel: Channel name
-  - thumbnailUrl: High quality thumbnail URL (e.g., https://i.ytimg.com/vi/VIDEO_ID/hqdefault.jpg)
-  - videoUrl: Valid watch?v= format
-  - views: String
-  - duration: String
-  
-  Return JSON array of verified videos. ALL KOREAN.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              channel: { type: Type.STRING },
-              thumbnailUrl: { type: Type.STRING },
-              videoUrl: { type: Type.STRING },
-              views: { type: Type.STRING },
-              duration: { type: Type.STRING },
-            },
-          },
-        },
-      },
-    });
-
-    const videos = JSON.parse(response.text);
-
-    // URL 및 ID 정밀 검증
-    const validatedVideos = videos.filter((video: any) => {
-      if (!video.videoUrl || !video.videoUrl.includes('youtube.com')) {
-        console.warn(`[Video Validation] ❌ Invalid URL: ${video.videoUrl}`);
-        return false;
-      }
-
-      // Video ID 추출 시도
-      let videoId = '';
-      if (video.videoUrl.includes('watch?v=')) {
-        videoId = video.videoUrl.split('watch?v=')[1]?.split('&')[0];
-      } else if (video.videoUrl.includes('youtu.be/')) {
-        videoId = video.videoUrl.split('youtu.be/')[1]?.split('?')[0];
-      }
-
-      if (!videoId || videoId.length < 10) {
-        console.warn(`[Video Validation] ❌ Could not parse valid ID from: ${video.videoUrl}`);
-        return false;
-      }
-
-      // 썸네일 URL이 누락되거나 잘못되었을 경우 자동 수정
-      if (!video.thumbnailUrl || video.thumbnailUrl.includes('undefined')) {
-        video.thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-      }
-
-      console.log(`[Video Validation] ✅ Verified Active Video: ${video.title} (${videoId})`);
-      return true;
-    });
-
-    console.log(`[Video Validation] Final Playable Videos: ${validatedVideos.length}/${videos.length}`);
-    console.log('[fetchCourseVideos] SUCCESS - Returning videos:', validatedVideos);
-
-    // If we got valid videos, return them
-    if (validatedVideos.length > 0) {
-      return validatedVideos.slice(0, 3);
-    }
-
-    // Fallback: Return hardcoded videos if API returned empty
-    console.warn('[fetchCourseVideos] No videos found via API, using fallback videos');
-    return getFallbackVideos(golfCourse);
-
-  } catch (err) {
-    console.error("[fetchCourseVideos] ERROR - Failed to fetch videos for:", golfCourse, err);
-    // Return fallback videos on error
-    return getFallbackVideos(golfCourse);
-  }
+  return getFallbackVideos(golfCourse);
 }
 
 // Fallback videos for common golf courses

@@ -11,7 +11,7 @@ interface Props {
 }
 
 const ScheduleSection: React.FC<Props> = ({ roundingInfo, teeOffTime, totalDirectTravelTime, selectedRestaurantData, prepTime }) => {
-  const arrivalBuffer = 40;
+  const arrivalBuffer = roundingInfo.arrivalBuffer || 40;
   const mealDuration = 30;
 
   const parseMinutes = (str?: string) => {

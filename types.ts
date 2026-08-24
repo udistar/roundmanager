@@ -22,6 +22,9 @@ export interface RoundingInfo {
   homepage?: string;        // 공식 홈페이지 URL
   amenities?: string[];     // 예: ["그늘집", "프로샵", "사우나"]
   previewImageUrl?: string; // 골프장 전경 혹은 공식 홈페이지 캡쳐 이미지
+  members?: number;
+  booker?: string;
+  arrivalBuffer?: number;
 }
 
 export interface HourlyWeather {
