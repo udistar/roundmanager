@@ -33,6 +33,21 @@ export function windyEmbedUrl(lat: number, lng: number, overlay: Overlay = 'wind
   return `https://embed.windy.com/embed.html?${params.join('&')}`;
 }
 
+/**
+ * windy.com 에서 보기 링크 (Premium 로그인 상태로 보기).
+ * 공식 URL 형식 (Windy 스태프 공지 https://community.windy.com/topic/77/windy-com-url-parameters):
+ *   경로  https://www.windy.com/{lat}/{lon}      → 오른쪽 지점 예보(detail)
+ *   쿼리  ?{lat},{lon},{zoom}                   → 지도 중심/줌 (위경도는 소수점 필수)
+ * 두 형식은 함께 쓸 수 있다. www.windy.com 은 Android App Links(com.windyty.android)와
+ * iOS Universal Links(applinks paths "*")를 등록해 두어, 앱이 설치돼 있으면 앱으로, 없으면 웹으로 열린다.
+ * (windy:// 같은 커스텀 스킴은 공식 제공 안 함)
+ */
+export function windyWebUrl(lat: number, lng: number, zoom = 11): string {
+  const la = lat.toFixed(3);
+  const lo = lng.toFixed(3);
+  return `https://www.windy.com/${la}/${lo}?${la},${lo},${zoom}`;
+}
+
 interface Props {
   lat?: number;
   lng?: number;
@@ -53,7 +68,16 @@ const WindyMap: React.FC<Props> = ({ lat, lng, golfCourse, date, teeOffTime }) =
           <h2 className="text-lg font-black text-white tracking-tight">바람 지도</h2>
           <span className="text-[10px] text-slate-400">{golfCourse} · 티업 {date} {teeOffTime}</span>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
+          <a
+            href={windyWebUrl(lat, lng)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-full text-[11px] font-black bg-amber-400 text-slate-900 hover:bg-amber-300 transition-all"
+            title="windy.com(또는 설치된 Windy 앱)에서 골프장 위치 예보 열기 — Premium 로그인 상태면 Premium 예보로 표시"
+          >
+            <i className="fa-solid fa-arrow-up-right-from-square mr-1"></i>Windy에서 보기
+          </a>
           {OVERLAYS.map((o) => (
             <button
               key={o.id}
