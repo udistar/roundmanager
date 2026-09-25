@@ -1,6 +1,7 @@
 // Open-Meteo 응답 → 화면용 WeatherData 변환 (브라우저/Netlify Function 공용, 순수 함수)
 // 데이터 출처 표기 의무: "Weather data by Open-Meteo.com" (CC BY 4.0)
 import type { HourlyWeather, WeatherData } from '../types';
+import { daysBetween, parseDateField, seoulToday } from './dates';
 
 const DIRS_KO = ['북', '북북동', '북동', '동북동', '동', '동남동', '남동', '남남동', '남', '남남서', '남서', '서남서', '서', '서북서', '북서', '북북서'];
 
@@ -34,11 +35,9 @@ export function weatherCodeToKorean(code: number | null | undefined): string {
 }
 
 /** '2026년 10월 12일 (일)', '2026-10-12', '2026.10.12' → '2026-10-12' */
-export function toIsoDate(date: string | undefined): string | null {
-  if (!date) return null;
-  const m = date.match(/(20\d{2})\D+(\d{1,2})\D+(\d{1,2})/);
-  if (!m) return null;
-  return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+/** 날짜 문자열 → YYYY-MM-DD (연도 없는 "10월 2일", "10/2", "10.2(금)" 은 한국 시간 기준으로 연도 추정) */
+export function toIsoDate(date: string | undefined, now: Date = new Date()): string | null {
+  return parseDateField(date, now);
 }
 
 export function teeHourOf(teeOffTime: string | undefined): number {
@@ -47,13 +46,7 @@ export function teeHourOf(teeOffTime: string | undefined): number {
   return Math.min(Math.max(h, 0), 23);
 }
 
-export function seoulToday(now = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-}
-
-export function daysBetween(fromIso: string, toIso: string): number {
-  return Math.round((Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86400000);
-}
+export { seoulToday, daysBetween };
 
 type Hourly = Record<string, (number | null)[] | string[]>;
 
@@ -149,15 +142,27 @@ export function openMeteoUrl(lat: number, lng: number, isoDate: string): string 
 }
 
 /** 16일 초과 등 예보 불가 카드 */
+/** 예보를 보여줄 수 없을 때 카드 (날씨 섹션에 message 로 표시) */
+export function messageCard(condition: string, message: string): WeatherData {
+  return { source: 'Open-Meteo', temperature: '-', wind: '-', precipitation: '-', condition, hourly: [], error: true, message };
+}
+
 export function outOfRangeCard(ahead: number): WeatherData {
-  return {
-    source: 'Open-Meteo',
-    temperature: '-',
-    wind: '-',
-    precipitation: '-',
-    condition: `예보 범위 밖 (${ahead}일 후)`,
-    hourly: [],
-    error: true,
-    message: `예보는 16일 이내만 제공됩니다 (D-${ahead})`,
-  };
+  return messageCard(`예보 범위 밖 (D-${ahead})`, `예보는 티업 ${FORECAST_DAYS}일 전부터 볼 수 있어요 (티업까지 ${ahead}일 남음)`);
+}
+
+export function unparsableDateCard(raw: string | undefined): WeatherData {
+  return messageCard('날짜 인식 실패', `날짜${raw ? ` "${raw}"` : ''}를 인식하지 못해 날씨를 불러올 수 없어요. 라운드 날짜를 2026-10-02 형식으로 수정해 주세요.`);
+}
+
+export function missingCoordsCard(): WeatherData {
+  return messageCard('위치 정보 없음', '골프장 위치(좌표)를 찾지 못해 날씨를 불러올 수 없어요.');
+}
+
+export function pastRoundCard(): WeatherData {
+  return messageCard('지난 라운드', '지난 라운드라 예보를 보여드릴 수 없어요.');
+}
+
+export function weatherUnavailableCard(): WeatherData {
+  return messageCard('연결 실패', '날씨 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
 }

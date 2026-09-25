@@ -7,21 +7,26 @@ import {
   daysBetween,
   FORECAST_DAYS,
   openMeteoUrl,
+  missingCoordsCard,
   outOfRangeCard,
+  pastRoundCard,
   seoulToday,
   teeHourOf,
   toIsoDate,
+  unparsableDateCard,
 } from '../lib/weather';
 
 export { buildWeatherFromOpenMeteo, teeHourOf, toIsoDate, weatherCodeToKorean, windDirKo } from '../lib/weather';
 
 export async function fetchOpenMeteoWeather(info: RoundingInfo, now = new Date()): Promise<WeatherData[]> {
-  const isoDate = toIsoDate(info.date);
-  if (!info.lat || !info.lng || !isoDate) return [];
+  // 조용히 빈 결과를 돌려주지 않고, 이유를 카드 메시지로 보여준다.
+  const isoDate = toIsoDate(info.date, now);
+  if (!isoDate) return [unparsableDateCard(info.date)];
+  if (!info.lat || !info.lng) return [missingCoordsCard()];
 
   const ahead = daysBetween(seoulToday(now), isoDate);
   if (ahead >= FORECAST_DAYS) return [outOfRangeCard(ahead)];
-  if (ahead < -60) return [];
+  if (ahead < -60) return [pastRoundCard()];
 
   const teeHour = teeHourOf(info.teeOffTime);
   try {

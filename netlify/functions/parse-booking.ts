@@ -1,6 +1,13 @@
 import type { Config } from '@netlify/functions';
 import { GoogleGenAI, Type } from '@google/genai';
-import { enrichWithKnownCourse, mergeManualOverrides, parseBookingLocally } from '../../lib/bookingParser';
+import {
+  enrichWithKnownCourse,
+  formatDisplayDate,
+  mergeManualOverrides,
+  normalizeInfoDate,
+  parseBookingLocally,
+  resolveBookingDate,
+} from '../../lib/bookingParser';
 import type { ManualBookingFields } from '../../lib/bookingParser';
 import type { RoundingInfo } from '../../types';
 
@@ -29,7 +36,8 @@ export default async (req: Request) => {
 
   const fallback = () => {
     try {
-      return json({ ok: true, source: 'local', info: parseBookingLocally(message, manual) });
+      const local = normalizeInfoDate(parseBookingLocally(message, manual));
+      return json({ ok: true, source: 'local', info: local.info, isoDate: local.isoDate });
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'parse_failed';
       return json({ ok: false, reason, source: 'local' }, 200);
@@ -75,8 +83,12 @@ export default async (req: Request) => {
       return fallback();
     }
 
-    const info = enrichWithKnownCourse(mergeManualOverrides(parsed, manual));
-    return json({ ok: true, source: 'gemini', info });
+    // 모델은 연도를 빼먹거나(예: "10월 2일 (금)") 과거 연도(예: "2024-10-02")를 주기도 하므로 원문 파싱 날짜로 보정한다.
+    const resolvedIso = resolveBookingDate(parsed.date, message);
+    if (resolvedIso) parsed.date = formatDisplayDate(resolvedIso);
+
+    const { info, isoDate } = normalizeInfoDate(enrichWithKnownCourse(mergeManualOverrides(parsed, manual)));
+    return json({ ok: true, source: 'gemini', info, isoDate });
   } catch (error) {
     console.error('[parse-booking] Gemini failed, using local parser', error);
     return fallback();

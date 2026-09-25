@@ -9,6 +9,7 @@ import {
 import { findKnownCourse } from '../lib/knownCourses';
 import { loadCourseDirectory, matchCourse, searchCourses } from '../lib/courseDirectory';
 import { fetchOpenMeteoWeather } from './weatherService';
+import { weatherUnavailableCard } from '../lib/weather';
 
 // 1. 예약 메시지 파싱: 서버 AI가 있으면 사용하고, 실패하면 로컬 파서가 이어간다.
 export async function parseBookingMessage(message: string, manual?: ManualBookingFields): Promise<RoundingInfo> {
@@ -140,7 +141,7 @@ export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
     return await fetchOpenMeteoWeather(info);
   } catch (error) {
     console.warn('[fetchWeather] Open-Meteo failed', error);
-    return [];
+    return [weatherUnavailableCard()];
   }
 }
 

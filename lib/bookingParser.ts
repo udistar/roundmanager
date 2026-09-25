@@ -1,5 +1,6 @@
 import { RoundingInfo } from '../types';
 import { findKnownCourse } from './knownCourses';
+import { hasExplicitYear, inferIsoDate, makeIsoDate, parseDateField, seoulToday } from './dates';
 
 export interface ManualBookingFields {
   golfCourse?: string;
@@ -28,31 +29,49 @@ function normalizeWhitespace(text: string): string {
 export function extractDate(text: string, now: Date = new Date()): string | undefined {
   const iso = text.match(/(20\d{2})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})일?/);
   if (iso) {
-    return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+    return makeIsoDate(Number(iso[1]), Number(iso[2]), Number(iso[3])) ?? undefined;
   }
 
-  const compact = text.match(/(20\d{2})(\d{2})(\d{2})/);
+  const compact = text.match(/(?:^|\D)(20\d{2})(\d{2})(\d{2})(?!\d)/);
   if (compact) {
-    return `${compact[1]}-${compact[2]}-${compact[3]}`;
+    return makeIsoDate(Number(compact[1]), Number(compact[2]), Number(compact[3])) ?? undefined;
   }
 
-  // 연도 없는 문자: "10/12(일)", "10월 12일", "10.12(일)" → 가장 가까운 미래 날짜(지난 날짜면 내년)
+  // 연도 없는 문자: "10/12(일)", "10월 12일", "10.12(일)" → 한국 시간 기준 연도 추정
+  // (지난 지 며칠 넘은 날짜는 내년, 연말에 받은 1월 날짜도 내년)
   const monthDay =
     text.match(/(?:^|[^\d:])(\d{1,2})\s*월\s*(\d{1,2})\s*일/) ||
     text.match(/(?:^|[^\d:./])(\d{1,2})\s*\/\s*(\d{1,2})(?![\d:/])/) ||
     text.match(/(?:^|[^\d:.])(\d{1,2})\.(\d{1,2})\s*\(\s*[월화수목금토일]/);
   if (monthDay) {
-    const month = parseInt(monthDay[1], 10);
-    const day = parseInt(monthDay[2], 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      let year = now.getFullYear();
-      if (new Date(year, month - 1, day) < new Date(today.getTime() - 86400000)) year += 1;
-      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    }
+    return inferIsoDate(parseInt(monthDay[1], 10), parseInt(monthDay[2], 10), now) ?? undefined;
   }
 
   return undefined;
+}
+
+/**
+ * AI(Gemini)가 돌려준 날짜와 원문 로컬 파싱 결과를 합쳐 최종 YYYY-MM-DD 를 정한다.
+ * 모델 날짜에 연도가 없거나(예: "10월 2일 (금)"), 오늘(한국 시간)보다 과거인 연도(예: "2024-10-02")면
+ * 원문에서 로컬 파서가 찾은 날짜(연도 추정 포함)를 우선한다.
+ */
+export function resolveBookingDate(modelDate: string | undefined, message: string, now: Date = new Date()): string | undefined {
+  const localIso = extractDate(normalizeWhitespace(message || ''), now);
+  const modelIso = parseDateField(modelDate, now);
+  const today = seoulToday(now);
+  const modelUntrusted = !modelIso || !hasExplicitYear(modelDate) || modelIso < today;
+  if (localIso && modelUntrusted) return localIso;
+  if (modelIso && modelIso < today && Number(modelIso.slice(0, 4)) < Number(today.slice(0, 4))) {
+    // 원문에서 날짜를 못 찾았는데 모델이 작년 이전 연도를 준 경우: 월/일만 믿고 연도를 다시 추정
+    return inferIsoDate(Number(modelIso.slice(5, 7)), Number(modelIso.slice(8, 10)), now) ?? modelIso;
+  }
+  return modelIso ?? localIso;
+}
+
+/** 표시용 날짜를 연도 포함 한국어 형식으로 정규화하고 ISO 날짜를 함께 돌려준다. */
+export function normalizeInfoDate(info: RoundingInfo, now: Date = new Date()): { info: RoundingInfo; isoDate: string | null } {
+  const isoDate = parseDateField(info.date, now);
+  return { info: isoDate ? { ...info, date: formatDisplayDate(isoDate) } : info, isoDate };
 }
 
 export function extractTeeOffTime(text: string): string | undefined {
