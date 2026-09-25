@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Header from './components/Header';
 import BookingForm, { AnalyzeRequest } from './components/BookingForm';
 import WeatherSection from './components/WeatherSection';
+import WindyMap from './components/WindyMap';
 import RestaurantSection from './components/RestaurantSection';
 import ScheduleSection from './components/ScheduleSection';
 import MapSection from './components/MapSection';
@@ -185,7 +186,7 @@ const App: React.FC = () => {
     if (coords.address) setCurrentStartLocation(coords.address);
 
     const knownCourse = findKnownCourse(`${info.golfCourse} ${info.address || ''}`);
-    if (!knownCourse) {
+    if (!knownCourse && !(info.lat && info.lng)) {
       try {
         const verifiedLocation = await searchGolfCourseLocation(info.golfCourse);
         if (verifiedLocation) {
@@ -207,7 +208,7 @@ const App: React.FC = () => {
       } catch (error) {
         console.warn('[openDeparturePlan] course geocode skipped', error);
       }
-    } else {
+    } else if (knownCourse) {
       info.address = info.address || knownCourse.address;
       info.lat = info.lat || knownCourse.lat;
       info.lng = info.lng || knownCourse.lng;
@@ -593,6 +594,15 @@ const App: React.FC = () => {
                 </div>
               )
             }
+
+            {/* Windy 바람 지도 (공식 임베드 위젯, 키 불필요) */}
+            <WindyMap
+              lat={roundingInfo.lat}
+              lng={roundingInfo.lng}
+              golfCourse={roundingInfo.golfCourse}
+              date={roundingInfo.date}
+              teeOffTime={roundingInfo.teeOffTime}
+            />
 
             {/* Map & Timeline Vertical Layout */}
             <div className="space-y-12">

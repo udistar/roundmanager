@@ -48,12 +48,12 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
         </div>
         <div className="flex items-center space-x-2 bg-emerald-500/10 px-3 py-1 rounded-full">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Live</span>
+          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Open-Meteo 예보</span>
         </div>
       </div>
 
       {/* Main Source Cards - Dynamic Layout */}
-      <div className={`grid gap-2 relative z-10 ${data.length === 1 ? 'grid-cols-1' : 'grid-cols-3'}`}>
+      <div className={`grid gap-2 relative z-10 ${data.length === 1 ? 'grid-cols-1' : data.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
         {data.slice(0, 3).map((w, idx) => {
           // Check for error flag (using explicit 'error' property injected by service)
           const isError = (w as any).error;
@@ -66,7 +66,7 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
               >
                 <span className="text-[9px] font-black uppercase text-slate-500 mb-2">{w.source}</span>
                 <i className="fa-solid fa-circle-exclamation text-red-400 text-2xl mb-2 opacity-50"></i>
-                <span className="text-[10px] text-red-400/80">정보 없음</span>
+                <span className="text-[10px] text-red-400/80">{w.message || '정보 없음'}</span>
               </div>
             );
           }
@@ -111,8 +111,8 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
                     <i className="fa-solid fa-percent text-cyan-500/70 text-[7px] md:text-[8px]"></i>
                     <span className="text-cyan-400 font-bold">
                       {w.precipitation ? (
-                        w.precipitation.includes('(') ? w.precipitation.match(/\((\d+)%\)/)?.[1] + '%' : '0%'
-                      ) : '0%'}
+                        w.precipitation.includes('(') ? w.precipitation.match(/\((\d+)%\)/)?.[1] + '%' : '-'
+                      ) : '-'}
                     </span>
                   </div>
                 </div>
@@ -121,6 +121,11 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
           );
         })}
       </div>
+
+      <p className="relative z-10 text-[9px] text-slate-500 text-right">
+        카드를 누르면 티업 2시간 전~5시간 후 시간별 예보 · Weather data by{' '}
+        <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="underline text-slate-400">Open-Meteo.com</a> (CC BY 4.0)
+      </p>
 
       {/* Expanded Analysis Section */}
       {activeSource !== null && data[activeSource] && !(data[activeSource] as any).error && (
@@ -160,13 +165,13 @@ const WeatherSection: React.FC<Props> = ({ data }) => {
                       {/* 4. Precip */}
                       <div className="flex flex-col items-center">
                         <span className="text-[10px] font-bold text-sky-400">
-                          {h.precip ? (h.precip.includes('%') ? h.precip : h.precip + ' (0%)') : '0%'}
+                          {h.precip || '-'}
                         </span>
                       </div>
 
                       {/* 5. Wind */}
                       <div className="flex items-center space-x-1 border-t border-white/5 pt-2 w-full justify-center">
-                        <i className="fa-solid fa-location-arrow text-[8px] text-slate-600 -rotate-45"></i>
+                        <i className="fa-solid fa-location-arrow text-[8px] text-sky-500/70" style={{ transform: `rotate(${(h.windDeg ?? 225) + 180 - 45}deg)` }} title="바람이 불어가는 방향"></i>
                         <span className="text-[9px] font-bold text-slate-500">{h.wind}</span>
                       </div>
                     </div>

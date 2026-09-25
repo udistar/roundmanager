@@ -1,6 +1,5 @@
-import axios from 'axios';
 import { RoundingInfo, WeatherData, Restaurant } from "../types";
-import { getGeocode, SEARCH_PROXY_BASE } from './naverService';
+import { getGeocode, naverLocalSearch } from './naverService';
 import {
   enrichWithKnownCourse,
   mergeManualOverrides,
@@ -8,6 +7,8 @@ import {
   type ManualBookingFields,
 } from '../lib/bookingParser';
 import { findKnownCourse } from '../lib/knownCourses';
+import { loadCourseDirectory, matchCourse, searchCourses } from '../lib/courseDirectory';
+import { fetchOpenMeteoWeather } from './weatherService';
 
 // 1. 예약 메시지 파싱: 서버 AI가 있으면 사용하고, 실패하면 로컬 파서가 이어간다.
 export async function parseBookingMessage(message: string, manual?: ManualBookingFields): Promise<RoundingInfo> {
@@ -44,23 +45,42 @@ export async function parseBookingMessage(message: string, manual?: ManualBookin
     parsed.homepage = undefined;
   }
 
+  // 전국 골프장 디렉터리(약 640곳)로 주소/홈페이지 보강 → 주소 지오코딩으로 좌표 확보
+  if (parsed.golfCourse && !findKnownCourse(`${parsed.golfCourse} ${parsed.address || ''}`)) {
+    try {
+      const entries = await loadCourseDirectory();
+      const entry = matchCourse(entries, parsed.golfCourse);
+      if (entry) {
+        console.log(`[CourseDirectory] ${parsed.golfCourse} -> ${entry.n}`);
+        parsed.address = parsed.address || entry.a;
+        parsed.homepage = parsed.homepage || entry.u;
+        if (!parsed.courseScale && (entry.t || entry.h)) {
+          parsed.courseScale = [entry.t, entry.h ? `${entry.h}홀` : ''].filter(Boolean).join(' ');
+        }
+        if (!(parsed.lat && parsed.lng) && entry.a) {
+          const geo = await getGeocode(entry.a);
+          if (geo) {
+            parsed.lat = geo.lat;
+            parsed.lng = geo.lng;
+            parsed.address = geo.address || parsed.address;
+            return parsed; // 디렉터리 주소로 좌표 확정 → 네이버 검색 생략(호출 절약)
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[CourseDirectory] lookup skipped', error);
+    }
+  }
+
   // 네이버 검색은 보강만 하고, 실패해도 로컬 결과를 유지한다.
   if (parsed.golfCourse) {
     try {
-      const axios = (await import('axios')).default;
-
       console.log(`[Naver Search Override] Searching for: ${parsed.golfCourse}`);
 
-      const searchResponse = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
-        params: {
+      const searchResponse = await naverLocalSearch({
           query: parsed.golfCourse,
-          display: 5  // 여러 결과 확인
-        },
-        headers: {
-          'X-Naver-Client-Id': import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID,
-          'X-Naver-Client-Secret': import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET
-        }
-      });
+          display: 5
+        });
 
       if (searchResponse.data.items && searchResponse.data.items.length > 0) {
         // 모든 결과 로깅
@@ -114,25 +134,24 @@ export async function fetchTravelTime(_start: string, _destination: string): Pro
   return 70;
 }
 
-// 3. 날씨 정보 — 클라이언트에서 Gemini 키를 쓰지 않는다. 실패해도 출발 계획을 막지 않는다.
-export async function fetchWeather(_info: RoundingInfo): Promise<WeatherData[]> {
-  return [];
+// 3. 날씨 정보 — Open-Meteo(무료, 키 불필요) 실측 예보. 실패해도 출발 계획을 막지 않는다.
+export async function fetchWeather(info: RoundingInfo): Promise<WeatherData[]> {
+  try {
+    return await fetchOpenMeteoWeather(info);
+  } catch (error) {
+    console.warn('[fetchWeather] Open-Meteo failed', error);
+    return [];
+  }
 }
 
 
 // 3.5 골프장 위치 검색 (정확한 주소 및 좌표 확보용)
 export async function searchGolfCourseLocation(courseName: string): Promise<{ address: string, lat: number, lng: number } | null> {
   try {
-    const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
-      params: {
+    const response = await naverLocalSearch({
         query: courseName,
         display: 1
-      },
-      headers: {
-        'X-Naver-Client-Id': import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID,
-        'X-Naver-Client-Secret': import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET
-      }
-    });
+      });
 
     if (response.data.items && response.data.items.length > 0) {
       const item = response.data.items[0];
@@ -158,19 +177,11 @@ export async function searchGolfCourseLocation(courseName: string): Promise<{ ad
 // 3.6 식당 개별 정보 및 메뉴 보강 검색 (Naver Search API 활용)
 const searchRestaurantMenu = async (restaurantName: string, region: string = "") => {
   try {
-    const naverId = import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID;
-    const naverSecret = import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET;
 
-    const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
-      params: {
+    const response = await naverLocalSearch({
         query: `${region} ${restaurantName}`.trim(),
         display: 1
-      },
-      headers: {
-        'X-Naver-Client-Id': naverId,
-        'X-Naver-Client-Secret': naverSecret
-      }
-    });
+      });
 
     return response.data.items[0] || null;
   } catch (error) {
@@ -196,17 +207,11 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 export async function fetchRestaurants(info: RoundingInfo, _startLocation: string, startCoords?: { lat: number, lng: number } | null, userSearchQuery?: string): Promise<Restaurant[]> {
   const fetchFromNaver = async (query: string, type: 'before' | 'after', sortMethod: 'comment' | 'sim' = 'comment'): Promise<Restaurant[]> => {
     try {
-      const response = await axios.get(`${SEARCH_PROXY_BASE}/v1/search/local.json`, {
-        params: {
+      const response = await naverLocalSearch({
           query: query,
-          display: 8, // Reduce from 15 to 8 to minimize subsequent detail calls
+          display: 8,
           sort: sortMethod
-        },
-        headers: {
-          'X-Naver-Client-Id': import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID,
-          'X-Naver-Client-Secret': import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET
-        }
-      });
+        });
 
       // Process items sequentially to avoid 429 Too Many Requests
       const items = [];
@@ -625,29 +630,31 @@ function getFallbackVideos(golfCourse: string): any[] {
 
 // 6. 골프장 검색 (이름, 주소, 홈페이지 URL 반환)
 export async function searchGolfCourseList(keyword: string): Promise<{ title: string, address: string, link: string }[]> {
+  // 1) 로컬 전국 골프장 디렉터리 먼저 (네트워크/쿼터 불필요)
+  let local: { title: string, address: string, link: string }[] = [];
   try {
-    const naverId = import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID;
-    const naverSecret = import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET;
+    const entries = await loadCourseDirectory();
+    local = searchCourses(entries, keyword, 5).map(e => ({ title: e.n, address: e.a, link: e.u || '' }));
+  } catch (error) {
+    console.warn('[searchGolfCourseList] directory unavailable', error);
+  }
+  if (local.length >= 3) return local;
+
+  try {
 
     // "골프장" 키워드 자동 추가로 검색 정확도 향상
     const safeQuery = keyword.includes('골프') || keyword.includes('CC') || keyword.includes('GC')
       ? keyword
       : `${keyword} 골프장`;
 
-    const response = await axios.get('/naver-search/v1/search/local.json', {
-      params: {
+    const response = await naverLocalSearch({
         query: safeQuery,
-        display: 10, // 충분히 가져와서 필터링
+        display: 10,
         sort: 'random'
-      },
-      headers: {
-        'X-Naver-Client-Id': naverId,
-        'X-Naver-Client-Secret': naverSecret
-      }
-    });
+      });
 
     // 골프장 카테고리 필터링 (골프/스포츠/레저)
-    return response.data.items
+    const remote = response.data.items
       .filter((item: any) => {
         const cat = item.category || '';
         const title = item.title || '';
@@ -663,8 +670,10 @@ export async function searchGolfCourseList(keyword: string): Promise<{ title: st
         address: item.roadAddress || item.address,
         link: item.link || ''
       }));
+    const seen = new Set(local.map(l => l.title.replace(/\s+/g, '')));
+    return [...local, ...remote.filter((r: { title: string }) => !seen.has(r.title.replace(/\s+/g, '')))].slice(0, 5);
   } catch (error) {
     console.error("Golf course search failed:", error);
-    return [];
+    return local;
   }
 }

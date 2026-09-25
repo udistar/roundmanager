@@ -33,18 +33,23 @@ export interface HourlyWeather {
   condition: string;
   precip: string;
   wind: string;
+  windDeg?: number;  // 풍향(도, 불어오는 방향)
+  pop?: number;      // 강수확률 %
 }
 
 export interface WeatherData {
   source: string;
   temperature: string;
   wind: string;
+  windDeg?: number;
   precipitation: string;
   condition: string;
   hourly: HourlyWeather[];
   satelliteDescription?: string;
   satelliteImageUrl?: string;
   nowcast?: string;
+  error?: boolean;   // 예보 없음/범위 밖
+  message?: string;  // error 일 때 표시할 문구
 }
 
 export interface MenuItem {
