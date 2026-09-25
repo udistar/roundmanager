@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ManualBookingFields } from '../lib/bookingParser';
+import { loadCourseDirectory, searchCourses, type CourseDirectoryEntry } from '../lib/courseDirectory';
 
 export interface AnalyzeRequest {
   message: string;
@@ -21,6 +22,16 @@ const BookingForm: React.FC<Props> = ({ onAnalyze, loading }) => {
   const [golfCourse, setGolfCourse] = useState('');
   const [date, setDate] = useState('');
   const [teeOffTime, setTeeOffTime] = useState('');
+  const [courseDirectory, setCourseDirectory] = useState<CourseDirectoryEntry[]>([]);
+
+  // 전국 골프장 목록은 직접 입력칸을 쓸 때만 불러온다 (별도 청크)
+  const ensureDirectory = () => {
+    if (courseDirectory.length === 0) loadCourseDirectory().then(setCourseDirectory);
+  };
+  const courseSuggestions = useMemo(
+    () => (golfCourse.trim() ? searchCourses(courseDirectory, golfCourse, 12) : []),
+    [courseDirectory, golfCourse]
+  );
 
   const [startLocation, setStartLocation] = useState(() => {
     const saved = localStorage.getItem('defaultStartLocation');
@@ -141,10 +152,17 @@ const BookingForm: React.FC<Props> = ({ onAnalyze, loading }) => {
             <input
               type="text"
               className="w-full p-3 border-0 rounded-xl bg-white outline-none font-medium"
-              placeholder="골프장 (예: 엘리시안강촌CC)"
+              placeholder="골프장 (예: 엘리시안강촌CC) — 전국 골프장 자동완성"
               value={golfCourse}
+              list="course-directory-options"
+              onFocus={ensureDirectory}
               onChange={(e) => setGolfCourse(e.target.value)}
             />
+            <datalist id="course-directory-options">
+              {courseSuggestions.map((c) => (
+                <option key={`${c.n}|${c.a}`} value={c.n}>{c.a}</option>
+              ))}
+            </datalist>
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="date"

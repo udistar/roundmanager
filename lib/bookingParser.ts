@@ -25,7 +25,7 @@ function normalizeWhitespace(text: string): string {
   return text.replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim();
 }
 
-export function extractDate(text: string): string | undefined {
+export function extractDate(text: string, now: Date = new Date()): string | undefined {
   const iso = text.match(/(20\d{2})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})일?/);
   if (iso) {
     return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
@@ -34,6 +34,22 @@ export function extractDate(text: string): string | undefined {
   const compact = text.match(/(20\d{2})(\d{2})(\d{2})/);
   if (compact) {
     return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  }
+
+  // 연도 없는 문자: "10/12(일)", "10월 12일", "10.12(일)" → 가장 가까운 미래 날짜(지난 날짜면 내년)
+  const monthDay =
+    text.match(/(?:^|[^\d:])(\d{1,2})\s*월\s*(\d{1,2})\s*일/) ||
+    text.match(/(?:^|[^\d:./])(\d{1,2})\s*\/\s*(\d{1,2})(?![\d:/])/) ||
+    text.match(/(?:^|[^\d:.])(\d{1,2})\.(\d{1,2})\s*\(\s*[월화수목금토일]/);
+  if (monthDay) {
+    const month = parseInt(monthDay[1], 10);
+    const day = parseInt(monthDay[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let year = now.getFullYear();
+      if (new Date(year, month - 1, day) < new Date(today.getTime() - 86400000)) year += 1;
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
   }
 
   return undefined;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBookingLocally, reconstructRoundingInfo } from './bookingParser';
+import { extractDate, parseBookingLocally, reconstructRoundingInfo } from './bookingParser';
 import { estimateTravelMinutes, subtractMinutesFromTee } from './travelEstimate';
 import { SEOUL_CITY_HALL } from './knownCourses';
 
@@ -44,6 +44,23 @@ describe('parseBookingLocally', () => {
     expect(info.golfCourse).toMatch(/엘리시안강촌CC/);
     expect(info.teeOffTime).toBe('08:08');
     expect(info.address).toContain('북한강변길');
+  });
+
+  it('parses a year-less SMS like "[베어크리크 포천] 10/12(일) 07:32 티업 예약 확정"', () => {
+    const info = parseBookingLocally('[베어크리크 포천] 10/12(일) 07:32 티업 예약 확정');
+    expect(info.golfCourse).toMatch(/베어크리크 포천/);
+    expect(info.date).toMatch(/10월 12일/);
+    expect(info.teeOffTime).toBe('07:32');
+    expect(info.lat).toBeCloseTo(37.9675, 2);
+  });
+
+  it('infers the year for month/day-only dates', () => {
+    const now = new Date(2026, 8, 25); // 2026-09-25
+    expect(extractDate('10/12(일) 07:32', now)).toBe('2026-10-12');
+    expect(extractDate('10월 12일 티업', now)).toBe('2026-10-12');
+    expect(extractDate('3/2 08:00', now)).toBe('2027-03-02');
+    expect(extractDate('10.12(일) 07:32', now)).toBe('2026-10-12');
+    expect(extractDate('07:32 티업', now)).toBeUndefined();
   });
 
   it('throws a Korean error when required fields are missing', () => {
