@@ -1,16 +1,16 @@
+// 네이버 API는 모두 Netlify Functions(/api/naver/*)를 거친다.
+// 브라우저 번들에는 네이버 비밀키가 들어가지 않는다. (지도 JS SDK의 ncpKeyId만 공개 ID로 사용)
 
-import { RoundingInfo } from "../types";
-
-const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_MAP_CLIENT_ID || import.meta.env.VITE_NAVER_CLIENT_ID;
-const NAVER_CLIENT_SECRET = import.meta.env.VITE_NAVER_MAP_CLIENT_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET;
-// Proxy Prefix (defined in vite.config.ts and netlify.toml)
-const IS_PROD = import.meta.env.PROD;
 const NETLIFY_URL = 'https://roundmanager.netlify.app';
 
-// Relative path works in local dev (Vite proxy)
-// Absolute path is required for Mobile (Capacitor) to hit the Netlify proxy
-export const PROXY_BASE = IS_PROD ? `${NETLIFY_URL}/naver-api` : '/naver-api';
-export const SEARCH_PROXY_BASE = IS_PROD ? `${NETLIFY_URL}/naver-search` : '/naver-search';
+function isNativeApp(): boolean {
+    if (typeof window === 'undefined') return false;
+    const cap = (window as any).Capacitor;
+    return Boolean(cap?.isNativePlatform?.());
+}
+
+// 웹에서는 같은 출처(/api/...), Capacitor 앱에서는 운영 사이트의 함수로 보낸다.
+export const API_BASE = isNativeApp() ? NETLIFY_URL : '';
 
 export interface GeoLocation {
     lat: number;
@@ -18,129 +18,65 @@ export interface GeoLocation {
     address: string;
 }
 
+async function getJson<T = any>(path: string, params: Record<string, string | number | undefined>): Promise<T | null> {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== '') qs.append(k, String(v));
+    });
+    try {
+        const res = await fetch(`${API_BASE}${path}?${qs.toString()}`, { headers: { Accept: 'application/json' } });
+        if (!res.ok) {
+            console.warn(`[naver] ${path} -> ${res.status}`);
+            return null;
+        }
+        return (await res.json()) as T;
+    } catch (error) {
+        console.warn(`[naver] ${path} failed`, error);
+        return null;
+    }
+}
+
+/** 네이버 지역 검색 (서버 함수 경유). axios 응답과 같은 모양({ data: { items } })으로 돌려준다. */
+export async function naverLocalSearch(params: { query: string; display?: number; sort?: string }): Promise<{ data: { items: any[] } }> {
+    const data = await getJson<{ items?: any[] }>('/api/naver/search', {
+        query: params.query,
+        display: Math.min(params.display ?? 5, 5),
+        sort: params.sort,
+    });
+    return { data: { items: Array.isArray(data?.items) ? data!.items : [] } };
+}
+
 /**
- * 네이버 Geocoding API를 사용하여 주소의 좌표를 가져옵니다.
+ * 네이버 Geocoding (서버 함수 경유)
  * @param query 검색할 주소
  */
 export async function getGeocode(query: string): Promise<GeoLocation | null> {
-    try {
-        const response = await fetch(`${PROXY_BASE}/map-geocode/v2/geocode?query=${encodeURIComponent(query)}`, {
-            method: 'GET',
-            headers: {
-                'x-ncp-apigw-api-key-id': NAVER_CLIENT_ID,
-                'x-ncp-apigw-api-key': NAVER_CLIENT_SECRET,
-                'Accept': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            console.error('Naver Geocoding API Error:', response.statusText);
-            return null;
-        }
-
-        const data = await response.json();
-        if (data.status === 'OK' && data.addresses && data.addresses.length > 0) {
-            const address = data.addresses[0];
-            return {
-                lat: parseFloat(address.y),
-                lng: parseFloat(address.x),
-                address: address.roadAddress || address.jibunAddress
-            };
-        }
-        return null;
-    } catch (error) {
-        console.error('Failed to fetch geocode:', error);
-        return null;
+    if (!query) return null;
+    const data = await getJson<{ ok: boolean; lat: number; lng: number; address: string }>('/api/naver/geocode', { query });
+    if (data?.ok && Number.isFinite(data.lat) && Number.isFinite(data.lng)) {
+        return { lat: data.lat, lng: data.lng, address: data.address };
     }
+    return null;
 }
 
 /**
- * 네이버 Directions 5 API를 사용하여 경로 좌표를 가져옵니다. (필요 시 사용)
+ * 네이버 Directions 5 (서버 함수 경유). 실패하면 null → 호출부에서 거리 기반 추정으로 대체.
  */
 export async function getRoute(start: { lat: number, lng: number }, goal: { lat: number, lng: number }, waypoints?: { lat: number, lng: number }[]) {
-    const startStr = `${start.lng},${start.lat}`;
-    const goalStr = `${goal.lng},${goal.lat}`;
-
-    // traoptimal: 실시간 최적 경로 옵션 사용
-    let url = `${PROXY_BASE}/map-direction/v1/driving?start=${startStr}&goal=${goalStr}&option=traoptimal`;
-
-    if (waypoints && waypoints.length > 0) {
-        const wayPointsStr = waypoints.map(p => `${p.lng},${p.lat}`).join('|');
-        url += `&waypoints=${wayPointsStr}`;
+    const data = await getJson<{ ok: boolean; path: [number, number][]; summary: any }>('/api/naver/directions', {
+        start: `${start.lng},${start.lat}`,
+        goal: `${goal.lng},${goal.lat}`,
+        waypoints: waypoints && waypoints.length ? waypoints.map(p => `${p.lng},${p.lat}`).join('|') : undefined,
+        option: 'traoptimal',
+    });
+    if (data?.ok && Array.isArray(data.path) && data.summary) {
+        return { path: data.path, summary: data.summary, guide: undefined };
     }
-
-    try {
-        console.log('[getRoute] Requesting:', url);
-        console.log('[getRoute] Start:', start, 'Goal:', goal, 'Waypoints:', waypoints);
-
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'x-ncp-apigw-api-key-id': NAVER_CLIENT_ID,
-                'x-ncp-apigw-api-key': NAVER_CLIENT_SECRET,
-                'Accept': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            console.error('[getRoute] HTTP Error:', response.status, response.statusText);
-            const errorText = await response.text();
-            console.error('[getRoute] Error Response:', errorText);
-
-            // Try trafast as fallback
-            console.log('[getRoute] Trying trafast option as fallback...');
-            const fallbackUrl = url.replace('traoptimal', 'trafast');
-            const fallbackResponse = await fetch(fallbackUrl, {
-                method: 'GET',
-                headers: {
-                    'x-ncp-apigw-api-key-id': NAVER_CLIENT_ID,
-                    'x-ncp-apigw-api-key': NAVER_CLIENT_SECRET,
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!fallbackResponse.ok) {
-                console.error('[getRoute] Fallback also failed');
-                return null;
-            }
-
-            const fallbackData = await fallbackResponse.json();
-            if (fallbackData.code === 0 && fallbackData.route && fallbackData.route.trafast) {
-                const routeInfo = fallbackData.route.trafast[0];
-                console.log('[getRoute] Fallback Success! Path points:', routeInfo.path.length);
-                return {
-                    path: routeInfo.path, // [lng, lat] 배열
-                    summary: routeInfo.summary,
-                    guide: routeInfo.guide
-                };
-            }
-            return null;
-        }
-
-        const data = await response.json();
-        console.log('[getRoute] Response code:', data.code);
-
-        if (data.code === 0 && data.route && data.route.traoptimal) {
-            const routeInfo = data.route.traoptimal[0];
-            console.log('[getRoute] Success! Path points:', routeInfo.path.length, 'Duration:', routeInfo.summary.duration, 'ms');
-            return {
-                path: routeInfo.path, // [lng, lat] 배열
-                summary: routeInfo.summary,
-                guide: routeInfo.guide
-            };
-        }
-
-        console.warn('[getRoute] Invalid response code or missing route data:', data.code);
-        return null;
-    } catch (error) {
-        console.error('[getRoute] Failed to fetch route:', error);
-        return null;
-    }
+    return null;
 }
 
 /**
- * 네이버 Static Map API를 사용하여 지도 이미지를 fetch하고 Blob URL을 반환합니다.
- * (Header 인증 사용을 위해 img tag src 대신 fetch 사용)
+ * 네이버 Static Map (서버 함수 경유) → Blob URL
  */
 export async function fetchStaticMapImage(params: {
     width: number;
@@ -150,39 +86,19 @@ export async function fetchStaticMapImage(params: {
     markers?: { lat: number; lng: number; color?: string; label?: string }[];
 }): Promise<string | null> {
     const { width, height, center, level, markers } = params;
-    // Use /raster endpoint (Server Auth) via Proxy
-    let url = `${PROXY_BASE}/map-static/v2/raster?w=${width}&h=${height}`;
-
-    if (center) {
-        url += `&center=${center.lng},${center.lat}`;
-    }
-    if (level !== undefined) {
-        url += `&level=${level}`;
-    }
-
-    if (markers && markers.length > 0) {
-        const markersStr = markers
-            .map(m => {
-                const color = m.color || 'red';
-                const size = 'large'; // Changed from 'mid' to 'large'
-                const type = 'd'; // Default marker type
-                const label = m.label || '';
-                return `type:${type}|size:${size}|color:${color}|pos:${m.lng}%20${m.lat}${label ? `|label:${label}` : ''}`;
-            })
-            .map(m => `markers=${m}`)
-            .join('&');
-        url += `&${markersStr}`;
-    }
+    const qs = new URLSearchParams({ w: String(width), h: String(height) });
+    if (center) qs.set('center', `${center.lng},${center.lat}`);
+    if (level !== undefined) qs.set('level', String(level));
+    (markers || []).forEach(m => {
+        const label = m.label ? `|label:${m.label}` : '';
+        // color는 Naver 규격 값일 때만 지정 (예: 'red' 같은 CSS 이름은 403)
+        const color = m.color ? `|color:${m.color}` : '';
+        qs.append('markers', `type:d|size:mid${color}|pos:${m.lng} ${m.lat}${label}`);
+    });
 
     try {
-        const response = await fetch(url, {
-            headers: {
-                'x-ncp-apigw-api-key-id': NAVER_CLIENT_ID,
-                'x-ncp-apigw-api-key': NAVER_CLIENT_SECRET
-            }
-        });
-        if (!response.ok) throw new Error(response.statusText);
-
+        const response = await fetch(`${API_BASE}/api/naver/static-map?${qs.toString()}`);
+        if (!response.ok) throw new Error(String(response.status));
         const blob = await response.blob();
         return URL.createObjectURL(blob);
     } catch (e) {
@@ -191,50 +107,16 @@ export async function fetchStaticMapImage(params: {
     }
 }
 
-const SEARCH_CLIENT_ID = import.meta.env.VITE_NAVER_SEARCH_ID || import.meta.env.VITE_NAVER_CLIENT_ID;
-const SEARCH_CLIENT_SECRET = import.meta.env.VITE_NAVER_SEARCH_SECRET || import.meta.env.VITE_NAVER_CLIENT_SECRET;
-
 /**
- * 네이버 검색 API를 사용하여 장소(POI)의 좌표를 가져옵니다.
- * Geocoding API가 실패할 경우 Fallback으로 사용합니다.
+ * 네이버 검색 API로 장소(POI) 좌표를 가져온다. Geocoding 실패 시 폴백.
  */
 export async function searchLocation(query: string): Promise<GeoLocation | null> {
-    try {
-        // 검색 API 프록시 사용 (SEARCH_PROXY_BASE: /naver-search)
-        const url = `${SEARCH_PROXY_BASE}/v1/search/local.json?query=${encodeURIComponent(query)}&display=1&sort=random`;
-
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'X-Naver-Client-Id': SEARCH_CLIENT_ID,
-                'X-Naver-Client-Secret': SEARCH_CLIENT_SECRET,
-                'Accept': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            console.error('Naver Search API Error:', response.statusText);
-            return null;
-        }
-
-        const data = await response.json();
-        if (data.items && data.items.length > 0) {
-            const item = data.items[0];
-            // Naver Search API returns mapx/mapy as integers (Lat/Lng * 10,000,000)
-            const lat = parseInt(item.mapy) / 10000000;
-            const lng = parseInt(item.mapx) / 10000000;
-
-            return {
-                lat,
-                lng,
-                address: item.roadAddress || item.address
-            };
-        }
-        return null;
-
-    } catch (error) {
-        console.error('Failed to search location:', error);
-        return null;
-    }
+    const { data } = await naverLocalSearch({ query, display: 1, sort: 'random' });
+    const item = data.items[0];
+    if (!item) return null;
+    // 지역검색 mapx/mapy = WGS84 * 10,000,000
+    const lat = parseInt(item.mapy, 10) / 10000000;
+    const lng = parseInt(item.mapx, 10) / 10000000;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng, address: item.roadAddress || item.address };
 }
-

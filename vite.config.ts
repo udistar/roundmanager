@@ -2,48 +2,14 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// 네이버 API 프록시는 더 이상 Vite에 두지 않는다.
+// 로컬에서 지도/검색까지 확인하려면 `netlify dev` (함수 /api/naver/* 포함)로 실행.
+// `npm run dev` 만 쓰면 함수가 없어서 Leaflet 지도 + 거리 기반 이동시간 추정으로 동작한다.
 export default defineConfig(() => {
   return {
     server: {
       port: 3003,
       host: '0.0.0.0',
-      proxy: {
-        // 기존 지도 API 프록시 (Cloud API / Open API 통합)
-        '/naver-api': {
-          target: 'https://naveropenapi.apigw.ntruss.com',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/naver-api/, ''),
-          secure: false,
-        },
-        // 기존 지도 API 프록시 (Open API)
-        '/naver-map': {
-          target: 'https://naveropenapi.apigw.ntruss.com',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/naver-map/, ''),
-        },
-        // ✅ [추가] 검색 API 프록시 (맛집 검색용 - openapi.naver.com)
-        '/naver-search': {
-          target: 'https://openapi.naver.com',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/naver-search/, ''),
-          secure: false,
-          configure: (proxy, options) => {
-            proxy.on('proxyReq', (proxyReq, req, res) => {
-              // 검색 API는 X-Naver-Client-Id/Secret 헤더를 사용
-              // 클라이언트에서 보낸 헤더를 그대로 전달
-              const clientId = req.headers['x-naver-client-id'];
-              const clientSecret = req.headers['x-naver-client-secret'];
-
-              if (clientId) {
-                proxyReq.setHeader('X-Naver-Client-Id', clientId);
-              }
-              if (clientSecret) {
-                proxyReq.setHeader('X-Naver-Client-Secret', clientSecret);
-              }
-            });
-          },
-        },
-      },
     },
     plugins: [react()],
     resolve: {

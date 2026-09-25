@@ -10,20 +10,11 @@
   SECRETS_SCAN_ENABLED = "false"
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
-[[redirects]]
-  from = "/naver-api/*"
-  to = "https://naveropenapi.apigw.ntruss.com/:splat"
-  status = 200
-  force = true
+# 네이버 API는 netlify/functions/naver-*.ts 가 서버 키(NAVER_CLIENT_ID/SECRET, NAVER_SEARCH_ID/SECRET)로 호출한다.
+# (예전 /naver-api, /naver-map, /naver-search 프록시 리다이렉트는 브라우저가 비밀키를 보내야 해서 제거)
 
-[[redirects]]
-  from = "/naver-map/*"
-  to = "https://naveropenapi.apigw.ntruss.com/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/naver-search/*"
-  to = "https://openapi.naver.com/:splat"
-  status = 200
-  force = true
+[dev]
+  command = "npm run dev"
+  targetPort = 3003
+  port = 8888
+  framework = "#custom"
